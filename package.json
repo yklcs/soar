@@ -6,15 +6,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "biome format --write **/*",
-    "build": "tsc"
+    "build": "tsc",
+    "start": "node ./lib/index.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Lucas Yunkyu Lee <lucas@yklcs.com>",
   "license": "ISC",
   "type": "module",
   "dependencies": {
     "commander": "^11.1.0",
-    "solid": "^0.2.1"
+    "glob": "^10.3.10",
+    "solid-js": "^1.8.12"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.5.3",

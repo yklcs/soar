@@ -1,14 +1,17 @@
 import { Command } from "commander"
-import packageJson from "../package.json" assert { type: "json" }
+import { Site } from "./site.js"
 
-const program = new Command().version(packageJson.version)
+const program = new Command().version(process.env.npm_package_version ?? "")
 
 program
 	.command("build")
 	.alias("b")
 	.description("Build static pages from JSX")
-	.action(async () => {
-		console.log("hello world!")
+	.argument("[dir]", "directory", process.cwd())
+	.action(async (dir) => {
+		const site = new Site()
+		await site.scanFs(dir)
+		console.log(site.entries)
 	})
 
 program.parse(process.argv)
