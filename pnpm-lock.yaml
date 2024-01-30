@@ -1,0 +1,185 @@
+lockfileVersion: '6.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+dependencies:
+  commander:
+    specifier: ^11.1.0
+    version: 11.1.0
+  solid:
+    specifier: ^0.2.1
+    version: 0.2.1
+
+devDependencies:
+  '@biomejs/biome':
+    specifier: ^1.5.3
+    version: 1.5.3
+  '@types/node':
+    specifier: ^20.11.10
+    version: 20.11.10
+  typescript:
+    specifier: ^5.3.3
+    version: 5.3.3
+
+packages:
+
+  /@biomejs/biome@1.5.3:
+    resolution: {integrity: sha512-yvZCa/g3akwTaAQ7PCwPWDCkZs3Qa5ONg/fgOUT9e6wAWsPftCjLQFPXBeGxPK30yZSSpgEmRCfpGTmVbUjGgg==}
+    engines: {node: '>=14.*'}
+    hasBin: true
+    requiresBuild: true
+    optionalDependencies:
+      '@biomejs/cli-darwin-arm64': 1.5.3
+      '@biomejs/cli-darwin-x64': 1.5.3
+      '@biomejs/cli-linux-arm64': 1.5.3
+      '@biomejs/cli-linux-arm64-musl': 1.5.3
+      '@biomejs/cli-linux-x64': 1.5.3
+      '@biomejs/cli-linux-x64-musl': 1.5.3
+      '@biomejs/cli-win32-arm64': 1.5.3
+      '@biomejs/cli-win32-x64': 1.5.3
+    dev: true
+
+  /@biomejs/cli-darwin-arm64@1.5.3:
+    resolution: {integrity: sha512-ImU7mh1HghEDyqNmxEZBoMPr8SxekkZuYcs+gynKlNW+TALQs7swkERiBLkG9NR0K1B3/2uVzlvYowXrmlW8hw==}
+    engines: {node: '>=14.*'}
+    cpu: [arm64]
+    os: [darwin]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-darwin-x64@1.5.3:
+    resolution: {integrity: sha512-vCdASqYnlpq/swErH7FD6nrFz0czFtK4k/iLgj0/+VmZVjineFPgevOb+Sr9vz0tk0GfdQO60bSpI74zU8M9Dw==}
+    engines: {node: '>=14.*'}
+    cpu: [x64]
+    os: [darwin]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-linux-arm64-musl@1.5.3:
+    resolution: {integrity: sha512-DYuMizUYUBYfS0IHGjDrOP1RGipqWfMGEvNEJ398zdtmCKLXaUvTimiox5dvx4X15mBK5M2m8wgWUgOP1giUpQ==}
+    engines: {node: '>=14.*'}
+    cpu: [arm64]
+    os: [linux]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-linux-arm64@1.5.3:
+    resolution: {integrity: sha512-cupBQv0sNF1OKqBfx7EDWMSsKwRrBUZfjXawT4s6hKV6ALq7p0QzWlxr/sDmbKMLOaLQtw2Qgu/77N9rm+f9Rg==}
+    engines: {node: '>=14.*'}
+    cpu: [arm64]
+    os: [linux]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-linux-x64-musl@1.5.3:
+    resolution: {integrity: sha512-UUHiAnlDqr2Y/LpvshBFhUYMWkl2/Jn+bi3U6jKuav0qWbbBKU/ByHgR4+NBxpKBYoCtWxhnmatfH1bpPIuZMw==}
+    engines: {node: '>=14.*'}
+    cpu: [x64]
+    os: [linux]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-linux-x64@1.5.3:
+    resolution: {integrity: sha512-YQrSArQvcv4FYsk7Q91Yv4uuu5F8hJyORVcv3zsjCLGkjIjx2RhjYLpTL733SNL7v33GmOlZY0eFR1ko38tuUw==}
+    engines: {node: '>=14.*'}
+    cpu: [x64]
+    os: [linux]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-win32-arm64@1.5.3:
+    resolution: {integrity: sha512-HxatYH7vf/kX9nrD+pDYuV2GI9GV8EFo6cfKkahAecTuZLPxryHx1WEfJthp5eNsE0+09STGkKIKjirP0ufaZA==}
+    engines: {node: '>=14.*'}
+    cpu: [arm64]
+    os: [win32]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@biomejs/cli-win32-x64@1.5.3:
+    resolution: {integrity: sha512-fMvbSouZEASU7mZH8SIJSANDm5OqsjgtVXlbUqxwed6BP7uuHRSs396Aqwh2+VoW8fwTpp6ybIUoC9FrzB0kyA==}
+    engines: {node: '>=14.*'}
+    cpu: [x64]
+    os: [win32]
+    requiresBuild: true
+    dev: true
+    optional: true
+
+  /@types/node@20.11.10:
+    resolution: {integrity: sha512-rZEfe/hJSGYmdfX9tvcPMYeYPW2sNl50nsw4jZmRcaG0HIAb0WYEpsB05GOb53vjqpyE9GUhlDQ4jLSoB5q9kg==}
+    dependencies:
+      undici-types: 5.26.5
+    dev: true
+
+  /commander@11.1.0:
+    resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
+    engines: {node: '>=16'}
+    dev: false
+
+  /connect@1.9.2:
+    resolution: {integrity: sha512-6Z9RPjQOHjaI47gK385djHVv7SEkRm1Y9AAvBhiI7gSXpO5sFktTkAD+dkbcaiEo2xaNlS1KIJU3XRxqbPLx6w==}
+    deprecated: connect 1.x series is deprecated
+    dependencies:
+      formidable: 1.0.17
+      mime: 1.2.4
+      qs: 0.4.2
+    dev: false
+
+  /express@2.5.11:
+    resolution: {integrity: sha512-gc3jJ0P3Bh1Zjkxe0ICSNmjhDvYWKiXfQIdDWuRPr8S4IZAZexzJHjrzNz56LsRKHTL0OiXQq602GfwZjZ8xPQ==}
+    deprecated: express 2.x series is deprecated
+    hasBin: true
+    dependencies:
+      connect: 1.9.2
+      mime: 1.2.4
+      mkdirp: 0.3.0
+      qs: 0.4.2
+    dev: false
+
+  /formidable@1.0.17:
+    resolution: {integrity: sha512-95MFT5qipMvUiesmuvGP1BI4hh5XWCzyTapiNJ/k8JBQda7rPy7UCWYItz2uZEdTgGNy1eInjzlL9Wx1O9fedg==}
+    engines: {node: '>=0.8.0'}
+    deprecated: 'Please upgrade to latest, formidable@v2 or formidable@v3! Check these notes: https://bit.ly/2ZEqIau'
+    dev: false
+
+  /mime@1.2.4:
+    resolution: {integrity: sha512-u4y8WFj7SnfbHxyzCMSV2nL/GKbfZ+lidPf1V4/XUKCJ49N6ttQWp/xnqpbMQEx3naBSt93i2qtPLFj/mjPDaA==}
+    dev: false
+
+  /mkdirp@0.3.0:
+    resolution: {integrity: sha512-OHsdUcVAQ6pOtg5JYWpCBo9W/GySVuwvP9hueRMW7UqshC0tbfzLv8wjySTPm3tfUZ/21CE9E1pJagOA91Pxew==}
+    deprecated: Legacy versions of mkdirp are no longer supported. Please update to mkdirp 1.x. (Note that the API surface has changed to use Promises in 1.x.)
+    dev: false
+
+  /qs@0.4.2:
+    resolution: {integrity: sha512-VAtfWeUtlBOnGiWFok2vOIMmwumiLmpqXDcXQcAEIQmLYgDbjrkHrcFBfth+YVDeRsz7jX44dhJr7IBJR0t/FQ==}
+    dev: false
+
+  /solid@0.2.1:
+    resolution: {integrity: sha512-kVdiCZd2dMH7ESvmHrEZuOUgjADW2nWjiDzyhgPfC79i6UnZyzyspaMbpjxPh1JTul6Zh3bLocY9FaFY/ikyKA==}
+    dependencies:
+      express: 2.5.11
+      thermos: 0.1.0
+    dev: false
+
+  /thermos@0.1.0:
+    resolution: {integrity: sha512-1sYrbXxpUJyoBpPlDzXpiB4uS8OzwPL+C/chT58X8gD+EpQpIeLOAYEBx/JnCDIKa53ur9WYMvYEuAjbXwr8UQ==}
+    dev: false
+
+  /typescript@5.3.3:
+    resolution: {integrity: sha512-pXWcraxM0uxAS+tN0AG/BF2TyqmHO014Z070UsJ+pFvYuRSq8KH8DmWpnbXe0pEPDHXZV3FcAbJkijJ5oNEnWw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+    dev: true
+
+  /undici-types@5.26.5:
+    resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
+    dev: true
