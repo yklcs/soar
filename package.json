@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "lib/index.js",
+  "exports": {
+    "./jsx-runtime": {
+      "default": "./jsx-runtime/index.js",
+      "types": "./jsx-runtime/index.d.ts"
+    }
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "biome format --write **/*",
@@ -15,8 +21,9 @@
   "type": "module",
   "dependencies": {
     "commander": "^11.1.0",
-    "glob": "^10.3.10",
-    "solid-js": "^1.8.12"
+    "esbuild": "^0.20.0",
+    "globby": "^14.0.0",
+    "linkedom": "^0.16.8"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.5.3",
