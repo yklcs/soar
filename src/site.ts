@@ -70,13 +70,20 @@ class Site {
 		await fs.mkdir(this.builddir, { recursive: true })
 
 		for (const [filename, entry] of this.pages()) {
-			const built = await esbuild.transform(await fs.readFile(filename), {
-				loader: "tsx",
+			const built = await esbuild.build({
+				entryPoints: [filename],
+				bundle: true,
+				write: false,
 				jsx: "automatic",
 				jsxImportSource: "soar",
+				platform: "node",
+				format: "esm",
+				alias: {
+					soar: path.resolve(import.meta.dirname, ".."),
+				},
 			})
 			const outpath = withExt(path.join(this.builddir, entry.rel), ".js")
-			await fs.writeFile(outpath, built.code)
+			await fs.writeFile(outpath, built.outputFiles[0].text)
 		}
 
 		for (const [filename, entry] of this.nonpages()) {
@@ -85,7 +92,14 @@ class Site {
 
 		await fs.writeFile(
 			path.join(this.builddir, "package.json"),
-			`{ "type": "module" }`,
+			JSON.stringify({
+				type: "module",
+			}),
+		)
+
+		await fs.copyFile(
+			path.join(import.meta.dirname, "jsx.d.ts"),
+			path.join(this.builddir, "jsx.d.ts"),
 		)
 	}
 
@@ -107,6 +121,8 @@ class Site {
 			await fs.copyFile(filename, path.join(this.outdir, entry.rel))
 		}
 	}
+
+	async serve() {}
 }
 
 const withExt = (file: string, ext: string) =>
