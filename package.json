@@ -20,8 +20,10 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@fastify/static": "^7.0.0",
     "commander": "^11.1.0",
     "esbuild": "^0.20.0",
+    "fastify": "^4.26.0",
     "globby": "^14.0.0",
     "linkedom": "^0.16.8"
   },

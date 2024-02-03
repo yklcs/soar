@@ -1,8 +1,10 @@
 import { globby } from "globby"
-import path from "path"
+import path from "node:path"
 import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
-import { render } from "./jsx.js"
+import { JSX, render, renderToString } from "./jsx.js"
+import fastify, { type FastifyInstance } from "fastify"
+import fastifyStatic from "@fastify/static"
 
 interface File {
 	abs: string
@@ -23,6 +25,7 @@ class Site {
 	rootdir: string
 	builddir: string
 	outdir: string
+	server?: FastifyInstance
 
 	constructor(opts: SiteOptions) {
 		this.files = new Map()
@@ -52,8 +55,20 @@ class Site {
 
 	pages(): Files {
 		return new Map(
-			[...this.files.entries()].filter(([_, entry]) =>
-				[".tsx", ".jsx"].includes(entry.ext),
+			[...this.files.entries()].filter(
+				([_, entry]) =>
+					[".tsx", ".jsx"].includes(entry.ext) &&
+					!path.basename(entry.abs).startsWith("_"),
+			),
+		)
+	}
+
+	generators(): Files {
+		return new Map(
+			[...this.files.entries()].filter(
+				([_, entry]) =>
+					[".tsx", ".jsx"].includes(entry.ext) &&
+					withExt(path.basename(entry.abs), "") === "_",
 			),
 		)
 	}
@@ -69,22 +84,18 @@ class Site {
 	async transform() {
 		await fs.mkdir(this.builddir, { recursive: true })
 
-		for (const [filename, entry] of this.pages()) {
-			const built = await esbuild.build({
-				entryPoints: [filename],
-				bundle: true,
-				write: false,
-				jsx: "automatic",
-				jsxImportSource: "soar",
-				platform: "node",
-				format: "esm",
-				alias: {
-					soar: path.resolve(import.meta.dirname, ".."),
-				},
-			})
-			const outpath = withExt(path.join(this.builddir, entry.rel), ".js")
-			await fs.writeFile(outpath, built.outputFiles[0].text)
-		}
+		await esbuild.build({
+			entryPoints: [...this.pages().keys(), ...this.generators().keys()],
+			bundle: true,
+			jsx: "automatic",
+			jsxImportSource: "soar",
+			platform: "node",
+			format: "esm",
+			alias: {
+				soar: path.resolve(import.meta.dirname, ".."),
+			},
+			outdir: this.builddir,
+		})
 
 		for (const [filename, entry] of this.nonpages()) {
 			await fs.copyFile(filename, path.join(this.builddir, entry.rel))
@@ -106,15 +117,28 @@ class Site {
 	async build() {
 		await fs.mkdir(this.outdir, { recursive: true })
 
-		for (const [filename, entry] of this.pages()) {
-			const outpath = withExt(path.join(this.builddir, entry.rel), ".js")
-			const mod = await import(outpath)
+		for (const [_, entry] of this.pages()) {
+			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
+			const mod = await import(modpath)
 			const Page = mod.default
-			const html = await render(Page())
-			await fs.writeFile(
-				withExt(path.join(this.outdir, entry.rel), ".html"),
-				html,
-			)
+			const html = await renderToString(Page())
+			const file = withExt(path.join(this.outdir, entry.rel), ".html")
+			await fs.mkdir(path.dirname(file), { recursive: true })
+			await fs.writeFile(file, html)
+		}
+
+		for (const [_, entry] of this.generators()) {
+			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
+			const mod = await import(modpath)
+			const generator: Record<string, JSX.FunctionalElement> = mod.default
+
+			for (const [slug, Page] of Object.entries(generator)) {
+				const html = await renderToString(Page({}))
+				const rel = path.dirname(entry.rel)
+				const file = withExt(path.join(this.outdir, rel, slug), ".html")
+				await fs.mkdir(path.dirname(file), { recursive: true })
+				await fs.writeFile(file, html)
+			}
 		}
 
 		for (const [filename, entry] of this.nonpages()) {
@@ -122,7 +146,97 @@ class Site {
 		}
 	}
 
-	async serve() {}
+	async serve() {
+		this.server = fastify({ logger: false })
+		this.server.register(fastifyStatic, {
+			root: this.rootdir,
+			wildcard: false,
+		})
+
+		this.server.get("/*", async (req, res) => {
+			const url = path.normalize(req.url)
+			const src = await findPathFromUrl(url, this.rootdir)
+			if (src === undefined) {
+				res.callNotFound()
+				return
+			}
+
+			const output = await esbuild.build({
+				stdin: {
+					contents: `
+						import Page from "./${path.relative(this.rootdir, src)}"
+						import { render } from "soar/jsx-runtime"
+						(async () => {
+							await render(Page(), document)
+						})()
+					`,
+					resolveDir: this.rootdir,
+				},
+				bundle: true,
+				write: false,
+				jsx: "automatic",
+				jsxImportSource: "soar",
+				platform: "browser",
+				format: "esm",
+				alias: {
+					soar: path.resolve(import.meta.dirname, ".."),
+				},
+			})
+			const built = output.outputFiles[0].text
+
+			res.type("text/html")
+			res.send(`
+			<!DOCTYPE html>
+			<html>
+			<head></head>
+			<body>
+				<script>${built}</script>
+			</body>
+			</html>
+			`)
+		})
+
+		this.server.listen({ port: 8000 })
+	}
+}
+
+/**
+ * Resolves possible indices in paths.
+ */
+const resolveIndices = (file: string) => {
+	const noExt = withExt(file, "")
+	if (path.basename(noExt) === "index") {
+		return stripTrailingSlash(path.dirname(noExt))
+	}
+	return noExt
+}
+
+const stripTrailingSlash = (str: string) => {
+	return str.replace(/\/+$/g, "")
+}
+
+const findPathFromUrl = async (
+	url: string,
+	root: string,
+): Promise<string | undefined> => {
+	const joined = path.join(root, url)
+	const resolved = resolveIndices(joined)
+	const basenames = ["index.tsx", "index.jsx"]
+	const extnames = [".tsx", ".jsx"]
+
+	for (const extname of extnames) {
+		const file = withExt(resolved, extname)
+		if (await fileExists(file)) {
+			return file
+		}
+	}
+
+	for (const basename of basenames) {
+		const file = path.join(resolved, basename)
+		if (await fileExists(file)) {
+			return file
+		}
+	}
 }
 
 const withExt = (file: string, ext: string) =>
@@ -130,5 +244,12 @@ const withExt = (file: string, ext: string) =>
 		path.dirname(file),
 		path.basename(file, path.extname(file)),
 	)}${ext}`
+
+const fileExists = async (file: string) => {
+	return await fs
+		.access(file)
+		.then(() => true)
+		.catch(() => false)
+}
 
 export { Site }

@@ -15,9 +15,15 @@ const jsx = (
 	props,
 })
 
-const render = async (root: VNode): Promise<string> => {
-	const { document } = parseHTML("<!DOCTYPE html>")
+const renderToString = async (root: VNode): Promise<string> => {
+	const { document } = parseHTML(
+		"<!DOCTYPE html><html><head></head><body></body></html>",
+	)
+	await render(root, document)
+	return document.toString()
+}
 
+const render = async (root: VNode, document: Document): Promise<undefined> => {
 	const _render = async (children: JSX.Children, parent: Node) => {
 		if (Array.isArray(children)) {
 			for (const child of children) {
@@ -33,8 +39,18 @@ const render = async (root: VNode): Promise<string> => {
 		}
 
 		if (typeof children.type === "string") {
-			const el = document.createElement(children.type)
-			parent.appendChild(el)
+			let el: HTMLElement
+			if (
+				children.type === "html" ||
+				children.type === "head" ||
+				children.type === "body"
+			) {
+				// biome-ignore lint/style/noNonNullAssertion: document will have these elements
+				el = document.querySelector(children.type)!
+			} else {
+				el = document.createElement(children.type)
+				parent.appendChild(el)
+			}
 			children.children && _render(children.children, el)
 		} else if (typeof children.type === "function") {
 			const inner = await children.type({
@@ -48,7 +64,6 @@ const render = async (root: VNode): Promise<string> => {
 	}
 
 	await _render(root, document)
-	return document.toString()
 }
 
 const Fragment = ({ children }: JSX.Props) => children
@@ -61,6 +76,9 @@ declare namespace JSX {
 	type Children = string | VNode | Children[]
 
 	interface Props extends BaseProps {}
+
+	type Element = VNode
+	type FunctionalElement = (props: Props) => VNode
 
 	type ElementType =
 		| Extract<keyof JSX.IntrinsicElements, string>
@@ -245,4 +263,4 @@ declare namespace JSX {
 	}
 }
 
-export { render, jsx, jsx as jsxs, Fragment, JSX }
+export { render, renderToString, jsx, jsx as jsxs, Fragment, JSX }
