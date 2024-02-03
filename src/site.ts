@@ -115,14 +115,19 @@ class Site {
 	}
 
 	async build() {
+		const generator = "Soar"
 		await fs.mkdir(this.outdir, { recursive: true })
 
 		for (const [_, entry] of this.pages()) {
 			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
 			const mod = await import(modpath)
 			const Page = mod.default
-			const html = await renderToString(Page())
-			const file = withExt(path.join(this.outdir, entry.rel), ".html")
+
+			const url = resolveIndices(entry.rel)
+			const props: JSX.PageProps = { url, generator }
+			const html = await renderToString(Page(props))
+
+			const file = path.join(this.outdir, url, "index.html")
 			await fs.mkdir(path.dirname(file), { recursive: true })
 			await fs.writeFile(file, html)
 		}
@@ -130,12 +135,14 @@ class Site {
 		for (const [_, entry] of this.generators()) {
 			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
 			const mod = await import(modpath)
-			const generator: Record<string, JSX.FunctionalElement> = mod.default
+			const gen: Record<string, JSX.FunctionalElement> = mod.default
 
-			for (const [slug, Page] of Object.entries(generator)) {
-				const html = await renderToString(Page({}))
-				const rel = path.dirname(entry.rel)
-				const file = withExt(path.join(this.outdir, rel, slug), ".html")
+			for (const [slug, Page] of Object.entries(gen)) {
+				const url = path.join(path.dirname(entry.rel), slug)
+				const props: JSX.PageProps = { url, generator }
+				const html = await renderToString(Page(props))
+
+				const file = path.join(this.outdir, url, "index.html")
 				await fs.mkdir(path.dirname(file), { recursive: true })
 				await fs.writeFile(file, html)
 			}

@@ -69,13 +69,16 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 const Fragment = ({ children }: JSX.Props) => children
 
 declare namespace JSX {
+	type Children = string | VNode | Children[]
+
+	interface PageProps extends Props {
+		url: string
+		generator: string
+	}
+	interface Props extends BaseProps {}
 	interface BaseProps {
 		children?: Children
 	}
-
-	type Children = string | VNode | Children[]
-
-	interface Props extends BaseProps {}
 
 	type Element = VNode
 	type FunctionalElement = (props: Props) => VNode
