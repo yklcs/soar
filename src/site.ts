@@ -1,7 +1,8 @@
 import { globby } from "globby"
-import path from "node:path"
+import * as path from "node:path"
 import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
+import * as vm from "node:vm"
 import { JSX, render, renderToString } from "./jsx.js"
 import fastify, { type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
@@ -172,10 +173,8 @@ class Site {
 				stdin: {
 					contents: `
 						import Page from "./${path.relative(this.rootdir, src)}"
-						import { render } from "soar/jsx-runtime"
-						(async () => {
-							await render(Page(), document)
-						})()
+						import { render, renderToString } from "soar/jsx-runtime"
+						renderToString(Page())
 					`,
 					resolveDir: this.rootdir,
 				},
@@ -183,24 +182,17 @@ class Site {
 				write: false,
 				jsx: "automatic",
 				jsxImportSource: "soar",
-				platform: "browser",
+				platform: "node",
 				format: "esm",
 				alias: {
 					soar: path.resolve(import.meta.dirname, ".."),
 				},
 			})
 			const built = output.outputFiles[0].text
+			const html = await vm.runInThisContext(built)
 
 			res.type("text/html")
-			res.send(`
-			<!DOCTYPE html>
-			<html>
-			<head></head>
-			<body>
-				<script>${built}</script>
-			</body>
-			</html>
-			`)
+			res.send(html)
 		})
 
 		this.server.listen({ port: 8000 })

@@ -21,10 +21,12 @@
   "type": "module",
   "dependencies": {
     "@fastify/static": "^7.0.0",
+    "browserslist": "^4.22.3",
     "commander": "^11.1.0",
     "esbuild": "^0.20.0",
     "fastify": "^4.26.0",
     "globby": "^14.0.0",
+    "lightningcss": "^1.23.0",
     "linkedom": "^0.16.8"
   },
   "devDependencies": {
