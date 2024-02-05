@@ -7,6 +7,7 @@ import { JSX } from "./jsx.js"
 import { renderToString } from "./render.js"
 import fastify, { type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
+import mdx from "@mdx-js/esbuild"
 
 interface File {
 	abs: string
@@ -61,7 +62,7 @@ class Site {
 		return new Map(
 			[...this.files.entries()].filter(
 				([_, entry]) =>
-					[".tsx", ".jsx"].includes(entry.ext) &&
+					[".tsx", ".jsx", ".mdx", ".md"].includes(entry.ext) &&
 					!path.basename(entry.abs).startsWith("_"),
 			),
 		)
@@ -80,7 +81,7 @@ class Site {
 	nonpages(): Files {
 		return new Map(
 			[...this.files.entries()].filter(
-				([_, entry]) => ![".tsx", ".jsx"].includes(entry.ext),
+				([_, entry]) => ![".tsx", ".jsx", ".mdx", ".md"].includes(entry.ext),
 			),
 		)
 	}
@@ -129,6 +130,7 @@ class Site {
 			const url = resolveIndices(entry.rel)
 			const props: JSX.PageProps = { url, generator: this.generator }
 			const html = await renderToString(await Page(props))
+
 			const file = path.join(this.outdir, url, "index.html")
 			await fs.mkdir(path.dirname(file), { recursive: true })
 			await fs.writeFile(file, html)
@@ -208,6 +210,7 @@ class Site {
 			alias: {
 				soar: path.resolve(import.meta.dirname, ".."),
 			},
+			plugins: [mdx({ jsxImportSource: "soar" })],
 		}
 	}
 }
@@ -233,8 +236,8 @@ const findPathFromUrl = async (
 ): Promise<string | undefined> => {
 	const joined = path.join(root, url)
 	const resolved = resolveIndices(joined)
-	const basenames = ["index.tsx", "index.jsx"]
-	const extnames = [".tsx", ".jsx"]
+	const extnames = [".tsx", ".jsx", ".mdx", ".md"]
+	const basenames = extnames.map((ext) => `index${ext}`)
 
 	for (const extname of extnames) {
 		const file = withExt(resolved, extname)
