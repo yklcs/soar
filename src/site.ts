@@ -88,39 +88,6 @@ class Site {
 		)
 	}
 
-	async transform() {
-		await fs.mkdir(this.builddir, { recursive: true })
-
-		await esbuild.build({
-			entryPoints: [...this.pages().keys(), ...this.generators().keys()],
-			bundle: true,
-			jsx: "automatic",
-			jsxImportSource: "soar",
-			platform: "node",
-			format: "esm",
-			alias: {
-				soar: path.resolve(import.meta.dirname, ".."),
-			},
-			outdir: this.builddir,
-		})
-
-		for (const [filename, entry] of this.nonpages()) {
-			await fs.copyFile(filename, path.join(this.builddir, entry.rel))
-		}
-
-		await fs.writeFile(
-			path.join(this.builddir, "package.json"),
-			JSON.stringify({
-				type: "module",
-			}),
-		)
-
-		await fs.copyFile(
-			path.join(import.meta.dirname, "jsx.d.ts"),
-			path.join(this.builddir, "jsx.d.ts"),
-		)
-	}
-
 	async build() {
 		await fs.mkdir(this.outdir, { recursive: true })
 
@@ -141,13 +108,13 @@ class Site {
 		for (const [_, entry] of this.generators()) {
 			const output = await esbuild.build(this.esbuildCfg(entry.rel))
 			const built = output.outputFiles[0].text
-			const gen: Record<string, JSX.FunctionalElement> = vm.runInThisContext(
+			const gentor: Record<string, JSX.FunctionalElement> = vm.runInThisContext(
 				built,
 				{ filename: `${entry.rel}:vm` },
 			)
 
-			for (const [slug, Page] of Object.entries(gen)) {
-				const url = path.join(path.dirname(entry.rel), slug)
+			for (const [slug, Page] of Object.entries(gentor)) {
+				const url = path.join("/", path.dirname(entry.rel), slug)
 				const props: JSX.PageProps = { url, generator: this.generator }
 				const html = await renderToString(await Page(props))
 
@@ -172,7 +139,26 @@ class Site {
 		this.server.get("/*", async (req, res) => {
 			const url = path.normalize(req.url)
 			const src = await findPathFromUrl(url, this.rootdir)
+
 			if (src === undefined) {
+				await this.scanFs()
+				for (const entry of this.generators().values()) {
+					const output = await esbuild.build(this.esbuildCfg(entry.rel))
+					const built = output.outputFiles[0].text
+					const gentor: Record<string, JSX.FunctionalElement> =
+						await vm.runInThisContext(built, { filename: `${entry.rel}:vm` })()
+
+					for (const [slug, Page] of Object.entries(gentor)) {
+						if (url === path.join("/", path.dirname(entry.rel), slug)) {
+							const props: JSX.PageProps = { url, generator: this.generator }
+							const html = await renderToString(await Page(props))
+							res.type("text/html")
+							res.send(html)
+							return
+						}
+					}
+				}
+
 				res.callNotFound()
 				return
 			}
