@@ -113,10 +113,6 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 	await _render(root, document)
 
-	const scopeCss = ([scope, style]: [string, string]) =>
-		`[scope="${scope}"] {${style}}`
-	const rawCss = Object.entries(styles).map(scopeCss).join("\n")
-
 	const targets = browserslistToTargets(browserslist(">= 0.25%"))
 
 	const css: string[] = []
@@ -124,6 +120,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 		const { code, map } = transformCss({
 			filename: "style.css",
 			code: Buffer.from(rawCss),
+			minify: true,
 			targets,
 			visitor: {
 				Selector(selector) {
@@ -135,15 +132,54 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 							value: scope,
 						},
 					}
-					return [selector[0], scopeSelector, ...selector.slice(1)]
+
+					const fragments: {
+						fragment: SelectorComponent[]
+						global: boolean
+					}[] = []
+
+					for (let i = 0; i < selector.length; i++) {
+						// build up a fragment
+						const fragment = []
+						let global = true
+						for (let j = i; j < selector.length; i = ++j) {
+							const jth = selector[j]
+
+							if (
+								jth.type !== "pseudo-class" ||
+								jth.kind !== "custom-function" ||
+								jth.name !== "global"
+							) {
+								global = false
+							}
+							fragment.push(jth)
+
+							if (jth.type === "combinator") {
+								break
+							}
+						}
+
+						fragments.push({
+							fragment,
+							global,
+						})
+					}
+					const scoped = fragments.flatMap(({ fragment, global }, i) => [
+						...(global || i === 0 ? [] : [scopeSelector]),
+						...fragment,
+					])
+					!fragments[fragments.length - 1].global && scoped.push(scopeSelector)
+					return scoped
 				},
 			},
 		})
-		css.push(code.toString())
+
+		const noGlobals = code.toString().replace(/:global\(([\s\S]*?)\)/gm, "$1")
+		css.push(noGlobals)
 	}
 
 	const style = document.createElement("style")
-	style.textContent = css.join("\n")
+	style.textContent = css.join("")
 	document.head.appendChild(style)
 }
 
