@@ -128,7 +128,7 @@ class Site {
 
 			const url = resolveIndices(entry.rel)
 			const props: JSX.PageProps = { url, generator: this.generator }
-			const html = await renderToString(Page(props))
+			const html = await renderToString(await Page(props))
 			const file = path.join(this.outdir, url, "index.html")
 			await fs.mkdir(path.dirname(file), { recursive: true })
 			await fs.writeFile(file, html)
@@ -145,7 +145,7 @@ class Site {
 			for (const [slug, Page] of Object.entries(gen)) {
 				const url = path.join(path.dirname(entry.rel), slug)
 				const props: JSX.PageProps = { url, generator: this.generator }
-				const html = await renderToString(Page(props))
+				const html = await renderToString(await Page(props))
 
 				const file = path.join(this.outdir, url, "index.html")
 				await fs.mkdir(path.dirname(file), { recursive: true })
@@ -179,7 +179,7 @@ class Site {
 			const built = output.outputFiles[0].text
 			const Page = vm.runInThisContext(built)
 			const html = await renderToString(
-				Page({ url, generator: this.generator }),
+				await Page({ url, generator: this.generator }),
 			)
 
 			res.type("text/html")

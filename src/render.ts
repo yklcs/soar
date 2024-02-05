@@ -84,7 +84,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			}
 
 			for (const [key, val] of Object.entries(node.props)) {
-				el.setAttribute(key, val)
+				el.setAttribute(key, val.toString())
 			}
 
 			// set scope only if node is in a scope

@@ -30,19 +30,20 @@ declare namespace JSX {
 		url: string
 		generator: string
 	}
-	interface Props extends BaseProps {}
+	interface Props extends BaseProps {
+		[key: string]: any
+	}
 	interface BaseProps {
 		children?: Children
 	}
 
 	type Element = VNode
-	type FunctionalElement = (props: Props) => VNode
+	type FunctionalElement = (props: Props) => VNode | Promise<VNode>
 
 	type ElementType =
 		| Extract<keyof JSX.IntrinsicElements, string>
+		| FunctionalElement
 		| string
-		| ((props: Props) => VNode)
-		| ((props: Props) => Promise<VNode>)
 
 	interface ElementChildrenAttribute {
 		children: "children"
