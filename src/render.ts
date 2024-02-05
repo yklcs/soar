@@ -84,7 +84,13 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			}
 
 			for (const [key, val] of Object.entries(node.props)) {
-				el.setAttribute(key, val.toString())
+				if (key === "style") {
+					Object.assign(el.style, val)
+				} else if (key === "className") {
+					el.setAttribute("class", val.toString())
+				} else {
+					el.setAttribute(key, val.toString())
+				}
 			}
 
 			// set scope only if node is in a scope

@@ -8,6 +8,8 @@ import { renderToString } from "./render.js"
 import fastify, { type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
 import mdx from "@mdx-js/esbuild"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 
 interface File {
 	abs: string
@@ -210,7 +212,13 @@ class Site {
 			alias: {
 				soar: path.resolve(import.meta.dirname, ".."),
 			},
-			plugins: [mdx({ jsxImportSource: "soar" })],
+			plugins: [
+				mdx({
+					jsxImportSource: "soar",
+					remarkPlugins: [remarkMath],
+					rehypePlugins: [rehypeKatex],
+				}),
+			],
 		}
 	}
 }
