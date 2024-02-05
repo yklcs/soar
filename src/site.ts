@@ -27,6 +27,7 @@ class Site {
 	builddir: string
 	outdir: string
 	server?: FastifyInstance
+	generator: string
 
 	constructor(opts: SiteOptions) {
 		this.files = new Map()
@@ -35,6 +36,7 @@ class Site {
 			opts.builddir ?? path.join(this.rootdir, ".soar"),
 		)
 		this.outdir = path.resolve(opts.outdir ?? path.join(this.rootdir, "dist"))
+		this.generator = "Soar"
 	}
 
 	async scanFs() {
@@ -116,31 +118,32 @@ class Site {
 	}
 
 	async build() {
-		const generator = "Soar"
 		await fs.mkdir(this.outdir, { recursive: true })
 
 		for (const [_, entry] of this.pages()) {
-			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
-			const mod = await import(modpath)
-			const Page = mod.default
+			const output = await esbuild.build(this.esbuildCfg(entry.rel))
+			const built = output.outputFiles[0].text
+			const Page = vm.runInThisContext(built, { filename: `${entry.rel}:vm` })
 
 			const url = resolveIndices(entry.rel)
-			const props: JSX.PageProps = { url, generator }
+			const props: JSX.PageProps = { url, generator: this.generator }
 			const html = await renderToString(Page(props))
-
 			const file = path.join(this.outdir, url, "index.html")
 			await fs.mkdir(path.dirname(file), { recursive: true })
 			await fs.writeFile(file, html)
 		}
 
 		for (const [_, entry] of this.generators()) {
-			const modpath = withExt(path.join(this.builddir, entry.rel), ".js")
-			const mod = await import(modpath)
-			const gen: Record<string, JSX.FunctionalElement> = mod.default
+			const output = await esbuild.build(this.esbuildCfg(entry.rel))
+			const built = output.outputFiles[0].text
+			const gen: Record<string, JSX.FunctionalElement> = vm.runInThisContext(
+				built,
+				{ filename: `${entry.rel}:vm` },
+			)
 
 			for (const [slug, Page] of Object.entries(gen)) {
 				const url = path.join(path.dirname(entry.rel), slug)
-				const props: JSX.PageProps = { url, generator }
+				const props: JSX.PageProps = { url, generator: this.generator }
 				const html = await renderToString(Page(props))
 
 				const file = path.join(this.outdir, url, "index.html")
@@ -169,33 +172,42 @@ class Site {
 				return
 			}
 
-			const output = await esbuild.build({
-				stdin: {
-					contents: `
-						import Page from "./${path.relative(this.rootdir, src)}"
-						import { render, renderToString } from "soar/jsx-runtime"
-						renderToString(Page())
-					`,
-					resolveDir: this.rootdir,
-				},
-				bundle: true,
-				write: false,
-				jsx: "automatic",
-				jsxImportSource: "soar",
-				platform: "node",
-				format: "esm",
-				alias: {
-					soar: path.resolve(import.meta.dirname, ".."),
-				},
-			})
+			const output = await esbuild.build(
+				this.esbuildCfg(path.relative(this.rootdir, src)),
+			)
 			const built = output.outputFiles[0].text
-			const html = await vm.runInThisContext(built)
+			const Page = vm.runInThisContext(built)
+			const html = await renderToString(
+				Page({ url, generator: this.generator }),
+			)
 
 			res.type("text/html")
 			res.send(html)
 		})
 
 		this.server.listen({ port: 8000 })
+	}
+
+	esbuildCfg(file: string): esbuild.BuildOptions & { write: false } {
+		return {
+			stdin: {
+				contents: `
+					import Page from "./${file}"
+					globalThis.Page = Page
+					Page
+				`,
+				resolveDir: this.rootdir,
+			},
+			bundle: true,
+			write: false,
+			jsx: "automatic",
+			jsxImportSource: "soar",
+			platform: "node",
+			format: "esm",
+			alias: {
+				soar: path.resolve(import.meta.dirname, ".."),
+			},
+		}
 	}
 }
 

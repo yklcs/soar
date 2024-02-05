@@ -11,7 +11,6 @@ program
 	.action(async (dir) => {
 		const site = new Site({ rootdir: dir })
 		await site.scanFs()
-		await site.transform()
 		await site.build()
 	})
 
