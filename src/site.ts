@@ -28,7 +28,6 @@ interface SiteOptions {
 class Site {
 	files: Files
 	rootdir: string
-	builddir: string
 	outdir: string
 	server?: FastifyInstance
 	generator: string
@@ -36,10 +35,7 @@ class Site {
 	constructor(opts: SiteOptions) {
 		this.files = new Map()
 		this.rootdir = path.resolve(opts.rootdir ?? process.cwd())
-		this.builddir = path.resolve(
-			opts.builddir ?? path.join(this.rootdir, ".soar"),
-		)
-		this.outdir = path.resolve(opts.outdir ?? path.join(this.rootdir, "dist"))
+		this.outdir = path.resolve(opts.outdir ?? path.join(process.cwd(), "dist"))
 		this.generator = "Soar"
 	}
 
@@ -96,7 +92,7 @@ class Site {
 			const built = output.outputFiles[0].text
 			const Page = vm.runInThisContext(built, { filename: `${entry.rel}:vm` })
 
-			const url = resolveIndices(entry.rel)
+			const url = path.resolve("/", resolveIndices(entry.rel))
 			const props: JSX.PageProps = { url, generator: this.generator }
 			const html = await renderToString(await Page(props))
 
@@ -125,6 +121,9 @@ class Site {
 		}
 
 		for (const [filename, entry] of this.nonpages()) {
+			await fs.mkdir(path.dirname(path.join(this.outdir, entry.rel)), {
+				recursive: true,
+			})
 			await fs.copyFile(filename, path.join(this.outdir, entry.rel))
 		}
 	}
