@@ -25,18 +25,23 @@ interface SiteOptions {
 	outdir?: string
 }
 
+type GeneratorRecord = Record<string, JSX.FunctionalElement>
+type Generator =
+	| GeneratorRecord
+	| (() => GeneratorRecord | Promise<GeneratorRecord>)
+
 class Site {
 	files: Files
 	rootdir: string
 	outdir: string
 	server?: FastifyInstance
-	generator: string
+	engine: string
 
 	constructor(opts: SiteOptions) {
 		this.files = new Map()
 		this.rootdir = path.resolve(opts.rootdir ?? process.cwd())
 		this.outdir = path.resolve(opts.outdir ?? path.join(process.cwd(), "dist"))
-		this.generator = "Soar"
+		this.engine = "Soar"
 	}
 
 	async scanFs() {
@@ -93,7 +98,7 @@ class Site {
 			const Page = vm.runInThisContext(built, { filename: `${entry.rel}:vm` })
 
 			const url = path.resolve("/", resolveIndices(entry.rel))
-			const props: JSX.PageProps = { url, generator: this.generator }
+			const props: JSX.PageProps = { url, generator: this.engine }
 			const html = await renderToString(await Page(props))
 
 			const file = path.join(this.outdir, url, "index.html")
@@ -104,14 +109,15 @@ class Site {
 		for (const [_, entry] of this.generators()) {
 			const output = await esbuild.build(this.esbuildCfg(entry.rel))
 			const built = output.outputFiles[0].text
-			const gentor: Record<string, JSX.FunctionalElement> = vm.runInThisContext(
-				built,
-				{ filename: `${entry.rel}:vm` },
-			)
+			const gentor: Generator = vm.runInThisContext(built, {
+				filename: `${entry.rel}:vm`,
+			})
+			const gentorRecord: GeneratorRecord =
+				typeof gentor === "function" ? await gentor() : gentor
 
-			for (const [slug, Page] of Object.entries(gentor)) {
+			for (const [slug, Page] of Object.entries(gentorRecord)) {
 				const url = path.join("/", path.dirname(entry.rel), slug)
-				const props: JSX.PageProps = { url, generator: this.generator }
+				const props: JSX.PageProps = { url, generator: this.engine }
 				const html = await renderToString(await Page(props))
 
 				const file = path.join(this.outdir, url, "index.html")
@@ -144,12 +150,15 @@ class Site {
 				for (const entry of this.generators().values()) {
 					const output = await esbuild.build(this.esbuildCfg(entry.rel))
 					const built = output.outputFiles[0].text
-					const gentor: Record<string, JSX.FunctionalElement> =
-						await vm.runInThisContext(built, { filename: `${entry.rel}:vm` })()
+					const gentor: Generator = vm.runInThisContext(built, {
+						filename: `${entry.rel}:vm`,
+					})
+					const gentorRecord: GeneratorRecord =
+						typeof gentor === "function" ? await gentor() : gentor
 
-					for (const [slug, Page] of Object.entries(gentor)) {
+					for (const [slug, Page] of Object.entries(gentorRecord)) {
 						if (url === path.join("/", path.dirname(entry.rel), slug)) {
-							const props: JSX.PageProps = { url, generator: this.generator }
+							const props: JSX.PageProps = { url, generator: this.engine }
 							const html = await renderToString(await Page(props))
 							res.type("text/html")
 							res.send(html)
@@ -168,7 +177,7 @@ class Site {
 			const built = output.outputFiles[0].text
 			const Page = vm.runInThisContext(built)
 			const html = await renderToString(
-				await Page({ url, generator: this.generator }),
+				await Page({ url, generator: this.engine }),
 			)
 
 			res.type("text/html")
@@ -260,4 +269,4 @@ const fileExists = async (file: string) => {
 		.catch(() => false)
 }
 
-export { Site }
+export { Site, type SiteOptions, type Generator }
