@@ -1,15 +1,15 @@
-interface VNode {
+interface VNode<P = any> {
 	type: JSX.ElementType
 	children?: JSX.Children
-	props: JSX.Props
+	props: P
 	scope?: string
 	style?: string
 	styled: (style: string) => VNode
 }
 
-const jsx = (
+const jsx = <P extends { children: JSX.Children }>(
 	type: JSX.ElementType,
-	{ children, ...props }: JSX.Props,
+	{ children, ...props }: P,
 ): VNode => ({
 	type,
 	children,
@@ -21,28 +21,23 @@ const jsx = (
 	},
 })
 
-const Fragment = ({ children }: JSX.Props) => children
+const Fragment = <P extends { children: JSX.Children }>({ children }: P) =>
+	children
 
 declare namespace JSX {
 	type Children = string | VNode | Children[]
 
-	interface PageProps extends Props {
+	interface PageProps {
 		url: string
 		generator: string
 	}
-	interface Props extends BaseProps {
-		[key: string]: any
-	}
-	interface BaseProps {
-		children?: Children
-	}
 
 	type Element = VNode
-	type FunctionalElement = (props: Props) => VNode | Promise<VNode>
+	type FunctionalElement<P = any> = (props: P) => VNode<P> | Promise<VNode<P>>
 
-	type ElementType =
+	type ElementType<P = any> =
 		| Extract<keyof JSX.IntrinsicElements, string>
-		| FunctionalElement
+		| FunctionalElement<P>
 		| string
 
 	interface ElementChildrenAttribute {

@@ -87,9 +87,9 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 				if (key === "style") {
 					Object.assign(el.style, val)
 				} else if (key === "className") {
-					el.setAttribute("class", val.toString())
+					el.setAttribute("class", val?.toString() ?? "")
 				} else {
-					el.setAttribute(key, val.toString())
+					el.setAttribute(key, val?.toString() ?? "")
 				}
 			}
 
