@@ -2,7 +2,6 @@ import { globby } from "globby"
 import * as path from "node:path"
 import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
-import * as vm from "node:vm"
 import { JSX } from "./jsx.js"
 import { renderToString } from "./render.js"
 import fastify, { type FastifyInstance } from "fastify"
@@ -93,9 +92,13 @@ class Site {
 		await fs.mkdir(this.outdir, { recursive: true })
 
 		for (const [_, entry] of this.pages()) {
-			const output = await esbuild.build(this.esbuildCfg(entry.rel))
+			const output = await esbuild.build(this.esbuildCfg(entry.abs))
 			const built = output.outputFiles[0].text
-			const Page = vm.runInThisContext(built, { filename: `${entry.rel}:vm` })
+			const dataUrl = `data:text/javascript;base64,${Buffer.from(
+				built,
+			).toString("base64")}`
+			const mod = await import(dataUrl)
+			const Page = mod.default
 
 			const url = path.resolve("/", resolveIndices(entry.rel))
 			const props: JSX.PageProps = { url, generator: this.engine }
@@ -107,11 +110,13 @@ class Site {
 		}
 
 		for (const [_, entry] of this.generators()) {
-			const output = await esbuild.build(this.esbuildCfg(entry.rel))
+			const output = await esbuild.build(this.esbuildCfg(entry.abs))
 			const built = output.outputFiles[0].text
-			const gentor: Generator = vm.runInThisContext(built, {
-				filename: `${entry.rel}:vm`,
-			})
+			const dataUrl = `data:text/javascript;base64,${Buffer.from(
+				built,
+			).toString("base64")}`
+			const mod = await import(dataUrl)
+			const gentor: Generator = mod.default
 			const gentorRecord: GeneratorRecord =
 				typeof gentor === "function" ? await gentor() : gentor
 
@@ -148,11 +153,13 @@ class Site {
 			if (src === undefined) {
 				await this.scanFs()
 				for (const entry of this.generators().values()) {
-					const output = await esbuild.build(this.esbuildCfg(entry.rel))
+					const output = await esbuild.build(this.esbuildCfg(entry.abs))
 					const built = output.outputFiles[0].text
-					const gentor: Generator = vm.runInThisContext(built, {
-						filename: `${entry.rel}:vm`,
-					})
+					const dataUrl = `data:text/javascript;base64,${Buffer.from(
+						built,
+					).toString("base64")}`
+					const mod = await import(dataUrl)
+					const gentor = mod.default
 					const gentorRecord: GeneratorRecord =
 						typeof gentor === "function" ? await gentor() : gentor
 
@@ -171,11 +178,13 @@ class Site {
 				return
 			}
 
-			const output = await esbuild.build(
-				this.esbuildCfg(path.relative(this.rootdir, src)),
-			)
+			const output = await esbuild.build(this.esbuildCfg(src))
 			const built = output.outputFiles[0].text
-			const Page = vm.runInThisContext(built)
+			const dataUrl = `data:text/javascript;base64,${Buffer.from(
+				built,
+			).toString("base64")}`
+			const mod = await import(dataUrl)
+			const Page = mod.default
 			const html = await renderToString(
 				await Page({ url, generator: this.engine }),
 			)
@@ -189,14 +198,7 @@ class Site {
 
 	esbuildCfg(file: string): esbuild.BuildOptions & { write: false } {
 		return {
-			stdin: {
-				contents: `
-					import Page from "./${file}"
-					globalThis.Page = Page
-					Page
-				`,
-				resolveDir: this.rootdir,
-			},
+			entryPoints: [file],
 			bundle: true,
 			write: false,
 			jsx: "automatic",
