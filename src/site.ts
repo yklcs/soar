@@ -2,7 +2,7 @@ import { globby } from "globby"
 import * as path from "node:path"
 import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
-import { JSX } from "./jsx.js"
+import { JSX, jsx } from "./jsx.js"
 import { renderToString } from "./render.js"
 import fastify, { type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
@@ -102,7 +102,13 @@ class Site {
 
 			const url = path.resolve("/", resolveIndices(entry.rel))
 			const props: JSX.PageProps = { url, generator: this.engine }
-			const html = await renderToString(await Page(props))
+			const html = await renderToString(
+				jsx(Page, {
+					url,
+					generator: this.engine,
+					children: undefined,
+				}),
+			)
 
 			const file = path.join(this.outdir, url, "index.html")
 			await fs.mkdir(path.dirname(file), { recursive: true })
@@ -123,7 +129,13 @@ class Site {
 			for (const [slug, Page] of Object.entries(gentorRecord)) {
 				const url = path.join("/", path.dirname(entry.rel), slug)
 				const props: JSX.PageProps = { url, generator: this.engine }
-				const html = await renderToString(await Page(props))
+				const html = await renderToString(
+					jsx(Page, {
+						url,
+						generator: this.engine,
+						children: undefined,
+					}),
+				)
 
 				const file = path.join(this.outdir, url, "index.html")
 				await fs.mkdir(path.dirname(file), { recursive: true })
@@ -166,7 +178,13 @@ class Site {
 					for (const [slug, Page] of Object.entries(gentorRecord)) {
 						if (url === path.join("/", path.dirname(entry.rel), slug)) {
 							const props: JSX.PageProps = { url, generator: this.engine }
-							const html = await renderToString(await Page(props))
+							const html = await renderToString(
+								jsx(Page, {
+									url,
+									generator: this.engine,
+									children: undefined,
+								}),
+							)
 							res.type("text/html")
 							res.send(html)
 							return
@@ -186,7 +204,7 @@ class Site {
 			const mod = await import(dataUrl)
 			const Page = mod.default
 			const html = await renderToString(
-				await Page({ url, generator: this.engine }),
+				jsx(Page, { url, generator: this.engine, children: undefined }),
 			)
 
 			res.type("text/html")

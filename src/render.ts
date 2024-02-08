@@ -25,19 +25,40 @@ const digest = async (message: string) => {
 
 type RenderedNode = Node | RenderedNode[]
 
-const applyScope = async (root: JSX.Children, scope: string) => {
+const applyScope = async (
+	root: JSX.Children,
+	scope: string,
+	rescope: boolean,
+) => {
 	if (typeof root === "string") {
 		return
 	}
 	if (Array.isArray(root)) {
 		for (const child of root) {
-			await applyScope(child, scope)
+			applyScope(child, scope, rescope)
 		}
 	} else {
-		if (root.scope === undefined) {
+		// if (root.scope === undefined) {
+		if (rescope && !root.__parentIsFn) {
 			root.scope = scope
 		}
-		root.children && (await applyScope(root.children, scope))
+		// }
+		// if (root.__parentIsFn)
+		root.children && applyScope(root.children, scope, rescope)
+	}
+}
+
+const setParentIsFn = (root: JSX.Children) => {
+	if (typeof root === "string") {
+		return
+	}
+	if (Array.isArray(root)) {
+		for (const child of root) {
+			setParentIsFn(child)
+		}
+	} else {
+		root.__parentIsFn = true
+		root.children && setParentIsFn(root.children)
 	}
 }
 
@@ -47,9 +68,15 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 	const _render = async (
 		node: JSX.Children,
 		parent: Node,
+		rescope = true,
+		depth = 0,
 	): Promise<RenderedNode> => {
 		if (Array.isArray(node)) {
-			return Promise.all(node.map((child) => _render(child, parent)))
+			const rendered = []
+			for (const child of node) {
+				rendered.push(await _render(child, parent, true, depth + 1))
+			}
+			return rendered
 		}
 
 		if (typeof node === "string") {
@@ -58,14 +85,21 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			return text
 		}
 
+		for (let i = 0; i < depth; i++) {
+			process.stdout.write(" ")
+		}
+
+		console.log(
+			`${typeof node.type === "string" ? node.type : node.type.name} ${
+				node.scope
+			} ${node.__parentIsFn}`,
+		)
+
 		// new scopes are created for styled nodes or functional elements
-		if (node.style !== undefined || typeof node.type === "function") {
-			const newscope = (await digest(node.style ?? node.type.toString())).slice(
-				0,
-				8,
-			)
-			styles[newscope] = node.style ?? ""
-			await applyScope(node, newscope)
+		if (node.style !== undefined) {
+			const newscope = (await digest(node.style)).slice(0, 8)
+			styles[newscope] = node.style
+			applyScope(node, newscope, rescope)
 			node.scope = newscope
 		}
 
@@ -96,19 +130,21 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			// set scope only if node is in a scope
 			node.scope && el.setAttribute("scope", node.scope)
 
-			node.children && (await _render(node.children, el))
+			node.children && (await _render(node.children, el, true, depth + 1))
 
 			return el
 		}
 
 		if (typeof node.type === "function") {
+			node.children && setParentIsFn(node.children)
 			const inner = await node.type({
 				...node.props,
 				children: node.children,
 			})
 
 			// render children with new scope or old scope
-			return await _render(inner, parent)
+			const rendered = await _render(inner, parent, true, depth + 1)
+			return rendered
 		}
 
 		// fallback

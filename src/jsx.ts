@@ -5,9 +5,10 @@ interface VNode<P = any> {
 	scope?: string
 	style?: string
 	styled: (style: string) => VNode
+	__parentIsFn: boolean
 }
 
-const jsx = <P extends { children: JSX.Children }>(
+const jsx = <P extends { children?: JSX.Children }>(
 	type: JSX.ElementType,
 	{ children, ...props }: P,
 ): VNode => ({
@@ -19,6 +20,7 @@ const jsx = <P extends { children: JSX.Children }>(
 		this.style = style
 		return this
 	},
+	__parentIsFn: false,
 })
 
 const Fragment = <P extends { children: JSX.Children }>({ children }: P) =>
