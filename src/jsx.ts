@@ -1,17 +1,21 @@
+let id = 0
+
 interface VNode<P = any> {
+	id: number
 	type: JSX.ElementType
 	children?: JSX.Children
 	props: P
 	scope?: string
 	style?: string
 	styled: (style: string) => VNode
-	__parentIsFn: boolean
+	__explicitChildren?: JSX.Children
 }
 
 const jsx = <P extends { children?: JSX.Children }>(
 	type: JSX.ElementType,
 	{ children, ...props }: P,
 ): VNode => ({
+	id: id++,
 	type,
 	children,
 	props,
@@ -20,7 +24,6 @@ const jsx = <P extends { children?: JSX.Children }>(
 		this.style = style
 		return this
 	},
-	__parentIsFn: false,
 })
 
 const Fragment = <P extends { children: JSX.Children }>({ children }: P) =>

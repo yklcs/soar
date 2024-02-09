@@ -15,51 +15,98 @@ const renderToString = async (root: VNode): Promise<string> => {
 	return document.toString()
 }
 
-const digest = async (message: string) => {
-	const msgUint8 = new TextEncoder().encode(message) // encode as (utf-8) Uint8Array
-	const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8) // hash the message
-	const hashArray = Array.from(new Uint8Array(hashBuffer)) // convert buffer to byte array
-	const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("") // convert bytes to hex string
-	return hashHex
+const digest = async (message: string, length: number) => {
+	const msgUint8 = new TextEncoder().encode(message)
+	const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8)
+	const hashArray = Array.from(new Uint8Array(hashBuffer))
+	const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("")
+	return hashHex.slice(0, length)
 }
 
 type RenderedNode = Node | RenderedNode[]
 
-const applyScope = async (
-	root: JSX.Children,
-	scope: string,
-	rescope: boolean,
-) => {
+const applyScope = async (root: JSX.Children, scope: string) => {
 	if (typeof root === "string") {
 		return
 	}
 	if (Array.isArray(root)) {
 		for (const child of root) {
-			applyScope(child, scope, rescope)
+			applyScope(child, scope)
 		}
 	} else {
 		// if (root.scope === undefined) {
-		if (rescope && !root.__parentIsFn) {
-			root.scope = scope
-		}
-		// }
-		// if (root.__parentIsFn)
-		root.children && applyScope(root.children, scope, rescope)
+		// if (root.__explicitChild || rescope) {
+		// if (typeof root.type !== "function") {
+		process.stdout.write(` (${root.id})`)
+
+		root.__explicitChildren && applyScope(root.__explicitChildren, scope)
+		root.scope = scope
 	}
 }
 
-const setParentIsFn = (root: JSX.Children) => {
-	if (typeof root === "string") {
-		return
-	}
-	if (Array.isArray(root)) {
-		for (const child of root) {
-			setParentIsFn(child)
-		}
+const formatChildren = (children: JSX.Children): string => {
+	if (Array.isArray(children)) {
+		return `[${children.map(formatChildren).join(" ")}]`
+	} else if (typeof children === "string") {
+		return ""
+	} else if (typeof children.type === "string") {
+		return `${children.type}-${children.id}`
+	} else if (typeof children.type === "function") {
+		return `${children.type.name}-${children.id}`
 	} else {
-		root.__parentIsFn = true
-		root.children && setParentIsFn(root.children)
+		return ""
 	}
+}
+
+const cmpChildren = (a: JSX.Children, b: JSX.Children): boolean => {
+	if (Array.isArray(a) && Array.isArray(b)) {
+		if (a.length !== b.length) {
+			return false
+		}
+		for (let i = 0; i < a.length; i++) {
+			if (!cmpChildren(a[i], b[i])) {
+				return false
+			}
+		}
+		return true
+	} else if (typeof a === "string" && typeof b === "string") {
+		return a === b
+	} else if (
+		typeof a === "object" &&
+		typeof b === "object" &&
+		!Array.isArray(a) &&
+		!Array.isArray(b)
+	) {
+		return a.id === b.id
+	}
+	return false
+}
+
+const prerender = async (root: VNode) => {
+	const _prerender = async (
+		node: JSX.Children,
+		depth: number,
+		scope: string,
+	) => {
+		if (Array.isArray(node)) {
+			for (const child of node) {
+				await _prerender(child, depth, scope)
+			}
+			return
+		} else if (typeof node === "string") {
+			return
+		}
+
+		if (node.style) {
+			scope = await digest(node.style, 6)
+		}
+		node.scope = scope
+
+		if (node.children) {
+			await _prerender(node, depth + 1, scope)
+		}
+	}
+	await _prerender(root, 0, "_root")
 }
 
 const render = async (root: VNode, document: Document): Promise<undefined> => {
@@ -68,13 +115,12 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 	const _render = async (
 		node: JSX.Children,
 		parent: Node,
-		rescope = true,
-		depth = 0,
+		depth: number,
 	): Promise<RenderedNode> => {
 		if (Array.isArray(node)) {
 			const rendered = []
 			for (const child of node) {
-				rendered.push(await _render(child, parent, true, depth + 1))
+				rendered.push(await _render(child, parent, depth))
 			}
 			return rendered
 		}
@@ -89,19 +135,26 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			process.stdout.write(" ")
 		}
 
-		console.log(
-			`${typeof node.type === "string" ? node.type : node.type.name} ${
-				node.scope
-			} ${node.__parentIsFn}`,
+		node.__explicitChildren ??= node.children
+
+		process.stdout.write(
+			`${typeof node.type === "string" ? node.type : node.type.name}-${
+				node.id
+			}`,
 		)
+
+		process.stdout.write(` <${formatChildren(node.__explicitChildren ?? "")}>`)
 
 		// new scopes are created for styled nodes or functional elements
 		if (node.style !== undefined) {
-			const newscope = (await digest(node.style)).slice(0, 8)
+			const newscope = await digest(node.style, 8)
 			styles[newscope] = node.style
-			applyScope(node, newscope, rescope)
 			node.scope = newscope
+			applyScope(node, newscope)
+			process.stdout.write(" *")
 		}
+		process.stdout.write(` ${node.scope}`)
+		console.log()
 
 		if (typeof node.type === "string") {
 			let el: HTMLElement
@@ -129,21 +182,28 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 			// set scope only if node is in a scope
 			node.scope && el.setAttribute("scope", node.scope)
-
-			node.children && (await _render(node.children, el, true, depth + 1))
+			node.children && (await _render(node.children, el, depth + 1))
 
 			return el
 		}
 
 		if (typeof node.type === "function") {
-			node.children && setParentIsFn(node.children)
 			const inner = await node.type({
 				...node.props,
 				children: node.children,
 			})
 
+			// console.log(`node: ${formatChildren(node)}`)
+			// console.log(`node children: ${formatChildren(node.children ?? "")}`)
+			// console.log(`inner: ${formatChildren(inner)}`)
+			// console.log(`inner children: ${formatChildren(inner.children ?? "")}`)
+
+			inner.__explicitChildren = Array.isArray(inner.children)
+				? inner.children.filter((x) => x !== node.children)
+				: undefined
+
 			// render children with new scope or old scope
-			const rendered = await _render(inner, parent, true, depth + 1)
+			const rendered = await _render(inner, parent, depth + 1)
 			return rendered
 		}
 
@@ -153,7 +213,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 		return text
 	}
 
-	await _render(root, document)
+	await _render(root, document, 0)
 
 	const targets = browserslistToTargets(browserslist(">= 0.25%"))
 
