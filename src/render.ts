@@ -82,35 +82,91 @@ const cmpChildren = (a: JSX.Children, b: JSX.Children): boolean => {
 	return false
 }
 
-const prerender = async (root: VNode) => {
+const styles: Record<string, string> = {}
+
+const prerender = async (root: VNode): Promise<VNode> => {
 	const _prerender = async (
 		node: JSX.Children,
 		depth: number,
 		scope: string,
-	) => {
+	): Promise<JSX.Children> => {
 		if (Array.isArray(node)) {
+			const children = []
 			for (const child of node) {
-				await _prerender(child, depth, scope)
+				children.push(await _prerender(child, depth, scope))
 			}
-			return
+			return children
 		} else if (typeof node === "string") {
-			return
+			return node
 		}
 
 		if (node.style) {
 			scope = await digest(node.style, 6)
+			styles[scope] = node.style
 		}
-		node.scope = scope
+		if (!node.scope) {
+			node.scope = scope
+		}
+
+		process.stdout.write("! ")
+		for (let i = 0; i < depth; i++) {
+			process.stdout.write(" ")
+		}
+		console.log(
+			`${typeof node.type === "string" ? node.type : node.type.name} ${
+				node.scope
+			}${node.style ? "*" : ""}`,
+		)
 
 		if (node.children) {
-			await _prerender(node, depth + 1, scope)
+			node.children = await _prerender(node.children, depth + 1, scope)
 		}
+
+		if (typeof node.type === "function") {
+			const inner = await node.type({ ...node.props, children: node.children })
+
+			// if (inner.style) {
+			// 	scope = await digest(inner.style, 6)
+			// 	styles[scope] = inner.style
+			// }
+			// inner.scope = scope
+
+			node = await _prerender(inner, depth + 1, scope)
+		}
+
+		return node
 	}
-	await _prerender(root, 0, "_root")
+
+	root = await _prerender(root, 0, "_root") as VNode
+
+	const _print = (node: JSX.Children, depth: number) => {
+		if (Array.isArray(node)) {
+			for (const child of node) {
+				_print(child, depth)
+			}
+			return
+		}
+		if (typeof node === "string") {
+			return
+		}
+
+		for (let i = 0; i < depth; i++) {
+			process.stdout.write(" ")
+		}
+		console.log(
+			`${typeof node.type === "string" ? node.type : node.type.name} ${
+				node.scope
+			}${node.style ? "*" : ""}`,
+		)
+		node.children && _print(node.children, depth + 1)
+	}
+
+	_print(root, 0)
+	return root
 }
 
 const render = async (root: VNode, document: Document): Promise<undefined> => {
-	const styles: Record<string, string> = {}
+	root = await prerender(root)
 
 	const _render = async (
 		node: JSX.Children,
@@ -137,24 +193,24 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 		node.__explicitChildren ??= node.children
 
-		process.stdout.write(
-			`${typeof node.type === "string" ? node.type : node.type.name}-${
-				node.id
-			}`,
-		)
+		// process.stdout.write(
+		// 	`${typeof node.type === "string" ? node.type : node.type.name}-${
+		// 		node.id
+		// 	}`,
+		// )
 
-		process.stdout.write(` <${formatChildren(node.__explicitChildren ?? "")}>`)
+		// process.stdout.write(` <${formatChildren(node.__explicitChildren ?? "")}>`)
 
 		// new scopes are created for styled nodes or functional elements
-		if (node.style !== undefined) {
-			const newscope = await digest(node.style, 8)
-			styles[newscope] = node.style
-			node.scope = newscope
-			applyScope(node, newscope)
-			process.stdout.write(" *")
-		}
-		process.stdout.write(` ${node.scope}`)
-		console.log()
+		// if (node.style !== undefined) {
+		// const newscope = await digest(node.style, 8)
+		// styles[newscope] = node.style
+		// node.scope = newscope
+		// applyScope(node, newscope)
+		// process.stdout.write(" *")
+		// }
+		// process.stdout.write(` ${node.scope}`)
+		// console.log()
 
 		if (typeof node.type === "string") {
 			let el: HTMLElement

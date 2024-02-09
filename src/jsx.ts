@@ -8,6 +8,7 @@ interface VNode<P = any> {
 	scope?: string
 	style?: string
 	styled: (style: string) => VNode
+	inner?: JSX.Children
 	__explicitChildren?: JSX.Children
 }
 
