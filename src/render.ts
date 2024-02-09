@@ -139,17 +139,6 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			return el
 		}
 
-		if (typeof node.type === "function") {
-			const inner = await node.type({
-				...node.props,
-				children: node.children,
-			})
-
-			// render children with new scope or old scope
-			const rendered = await _render(inner, parent, depth + 1)
-			return rendered
-		}
-
 		// fallback
 		const text = document.createTextNode(node.toString())
 		parent.appendChild(text)
