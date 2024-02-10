@@ -77,7 +77,7 @@ const prerender = async (root: VNode): Promise<VNode> => {
 		return node
 	}
 
-	root = await _prerender(root, 0, "_root") as VNode
+	root = (await _prerender(root, 0, "_root")) as VNode
 
 	return root
 }
