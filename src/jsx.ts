@@ -7,7 +7,7 @@ interface VNode<P = any> {
 	props: P
 	scope?: string
 	style?: string
-	styled: (style: string) => VNode
+	styled: (strs: TemplateStringsArray | string, ...vals: any[]) => VNode
 }
 
 const jsx = <P extends { children?: JSX.Children }>(
@@ -19,8 +19,14 @@ const jsx = <P extends { children?: JSX.Children }>(
 	children,
 	props,
 	style: undefined,
-	styled(style: string) {
-		this.style = style
+	styled(strs: TemplateStringsArray | string, ...vals: any[]) {
+		if (typeof strs === "string") {
+			this.style = strs
+		} else {
+			const arr = vals.map((val, i) => `${strs[i]}${val}`)
+			arr.push(strs[strs.length - 1])
+			this.style = arr.join("")
+		}
 		return this
 	},
 })
