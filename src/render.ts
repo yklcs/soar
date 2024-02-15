@@ -104,10 +104,6 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			return text
 		}
 
-		for (let i = 0; i < depth; i++) {
-			process.stdout.write(" ")
-		}
-
 		if (typeof node.type === "string") {
 			let el: HTMLElement
 			if (
