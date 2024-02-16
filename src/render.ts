@@ -163,42 +163,28 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 						},
 					}
 
-					const fragments: {
-						fragment: SelectorComponent[]
-						global: boolean
-					}[] = []
-
+					const scoped: SelectorComponent[] = []
 					for (let i = 0; i < selector.length; i++) {
-						// build up a fragment
-						const fragment = []
-						let global = true
-						for (let j = i; j < selector.length; i = ++j) {
-							const jth = selector[j]
-
-							if (
-								jth.type !== "pseudo-class" ||
-								jth.kind !== "custom-function" ||
-								jth.name !== "global"
-							) {
-								global = false
-							}
-							fragment.push(jth)
-
-							if (jth.type === "combinator") {
+						switch (selector[i].type) {
+							case "universal": {
+								scoped.push(scopeSelector)
 								break
 							}
+							case "type": {
+								scoped.push(selector[i])
+								scoped.push(scopeSelector)
+								break
+							}
+							case "class": {
+								scoped.push(scopeSelector)
+								scoped.push(selector[i])
+								break
+							}
+							default: {
+								scoped.push(selector[i])
+							}
 						}
-
-						fragments.push({
-							fragment,
-							global,
-						})
 					}
-					const scoped = fragments.flatMap(({ fragment, global }, i) => [
-						...(global || i === 0 ? [] : [scopeSelector]),
-						...fragment,
-					])
-					!fragments[fragments.length - 1].global && scoped.push(scopeSelector)
 					return scoped
 				},
 			},
