@@ -9,6 +9,7 @@ import fastifyStatic from "@fastify/static"
 import mdx from "@mdx-js/esbuild"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
+import { pathToFileURL } from "node:url"
 
 interface File {
 	abs: string
@@ -24,10 +25,7 @@ interface SiteOptions {
 	outdir?: string
 }
 
-type GeneratorRecord = Record<string, JSX.FunctionalElement>
-type Generator =
-	| GeneratorRecord
-	| (() => GeneratorRecord | Promise<GeneratorRecord>)
+type Generator = Record<string, JSX.FunctionalElement>
 
 class Site {
 	files: Files
@@ -123,10 +121,8 @@ class Site {
 			).toString("base64")}`
 			const mod = await import(dataUrl)
 			const gentor: Generator = mod.default
-			const gentorRecord: GeneratorRecord =
-				typeof gentor === "function" ? await gentor() : gentor
 
-			for (const [slug, Page] of Object.entries(gentorRecord)) {
+			for (const [slug, Page] of Object.entries(gentor)) {
 				const url = path.join("/", path.dirname(entry.rel), slug)
 				const props: JSX.PageProps = { url, generator: this.engine }
 				const html = await renderToString(
@@ -171,11 +167,9 @@ class Site {
 						built,
 					).toString("base64")}`
 					const mod = await import(dataUrl)
-					const gentor = mod.default
-					const gentorRecord: GeneratorRecord =
-						typeof gentor === "function" ? await gentor() : gentor
+					const gentor: Generator = mod.default
 
-					for (const [slug, Page] of Object.entries(gentorRecord)) {
+					for (const [slug, Page] of Object.entries(gentor)) {
 						if (url === path.join("/", path.dirname(entry.rel), slug)) {
 							const props: JSX.PageProps = { url, generator: this.engine }
 							const html = await renderToString(
@@ -185,6 +179,7 @@ class Site {
 									children: undefined,
 								}),
 							)
+
 							res.type("text/html")
 							res.send(html)
 							return
@@ -215,6 +210,9 @@ class Site {
 	}
 
 	esbuildCfg(file: string): esbuild.BuildOptions & { write: false } {
+		const filename = path.resolve(file)
+		const dirname = path.dirname(filename)
+
 		return {
 			entryPoints: [file],
 			bundle: true,
@@ -223,6 +221,15 @@ class Site {
 			jsxImportSource: "soar",
 			platform: "node",
 			format: "esm",
+			define: {
+				"import.meta": JSON.stringify({
+					url: pathToFileURL(filename),
+					filename,
+					dirname,
+				}),
+				__dirname: JSON.stringify(dirname),
+				__filename: JSON.stringify(filename),
+			},
 			alias: {
 				soar: path.resolve(import.meta.dirname, ".."),
 			},
