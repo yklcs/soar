@@ -226,6 +226,7 @@ class Site {
 			alias: {
 				soar: path.resolve(import.meta.dirname, ".."),
 			},
+			inject: [path.resolve(import.meta.dirname, "./require-shim.js")],
 			plugins: [
 				mdx({
 					jsxImportSource: "soar",
