@@ -120,7 +120,11 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 			for (const [key, val] of Object.entries(node.props)) {
 				if (key === "style") {
-					Object.assign(el.style, val)
+					if (typeof val === "string") {
+						el.style.cssText = val
+					} else {
+						Object.assign(el.style, val)
+					}
 				} else if (key === "className") {
 					el.setAttribute("class", val?.toString() ?? "")
 				} else {
