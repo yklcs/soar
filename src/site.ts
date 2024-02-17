@@ -221,15 +221,6 @@ class Site {
 			jsxImportSource: "soar",
 			platform: "node",
 			format: "esm",
-			define: {
-				"import.meta": JSON.stringify({
-					url: pathToFileURL(filename),
-					filename,
-					dirname,
-				}),
-				__dirname: JSON.stringify(dirname),
-				__filename: JSON.stringify(filename),
-			},
 			alias: {
 				soar: path.resolve(import.meta.dirname, ".."),
 			},
@@ -240,6 +231,32 @@ class Site {
 					remarkPlugins: [remarkMath],
 					rehypePlugins: [rehypeKatex],
 				}),
+				{
+					name: "import-meta",
+					setup(build) {
+						build.onLoad({ filter: /.*/ }, async ({ path: file }) => {
+							let contents = await fs.readFile(file, "utf8")
+
+							const url = pathToFileURL(file)
+							const filename = file
+							const dirname = path.dirname(file)
+
+							contents = contents
+								.replaceAll(
+									"import.meta",
+									JSON.stringify({
+										url,
+										filename,
+										dirname,
+									}),
+								)
+								.replaceAll("__dirname", JSON.stringify(dirname))
+								.replaceAll("__filename", JSON.stringify(filename))
+
+							return { contents, loader: "default" }
+						})
+					},
+				},
 			],
 		}
 	}
