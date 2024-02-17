@@ -39,9 +39,10 @@ const formatChildren = (children: JSX.Children): string => {
 	}
 }
 
-const styles: Record<string, string> = {}
-
-const prerender = async (root: VNode): Promise<VNode> => {
+const prerender = async (
+	root: VNode,
+): Promise<[VNode, Record<string, string>]> => {
+	const styles: Record<string, string> = {}
 	const _prerender = async (
 		node: JSX.Children,
 		depth: number,
@@ -79,11 +80,12 @@ const prerender = async (root: VNode): Promise<VNode> => {
 
 	root = (await _prerender(root, 0, "_root")) as VNode
 
-	return root
+	return [root, styles]
 }
 
 const render = async (root: VNode, document: Document): Promise<undefined> => {
-	root = await prerender(root)
+	let styles: Record<string, string>
+	;[root, styles] = await prerender(root)
 
 	const _render = async (
 		node: JSX.Children,
