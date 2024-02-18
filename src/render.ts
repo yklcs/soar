@@ -157,6 +157,8 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 	const css: string[] = []
 	for (const [scope, rawCss] of Object.entries(styles)) {
+		let wasGlobal = false
+
 		const { code, map } = transformCss({
 			filename: "style.css",
 			code: Buffer.from(rawCss),
@@ -164,6 +166,11 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			targets,
 			visitor: {
 				Selector(selector) {
+					if (selector[0].type === "nesting" && wasGlobal) {
+						return selector
+					}
+					wasGlobal = false
+
 					const scopeSelector: SelectorComponent = {
 						type: "attribute",
 						name: "scope",
@@ -186,6 +193,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 									if (i < selector.length) {
 										scoped.push(...selector.slice(i))
 									}
+									wasGlobal = true
 									return scoped
 								}
 
