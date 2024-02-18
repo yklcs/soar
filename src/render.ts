@@ -83,6 +83,12 @@ const prerender = async (
 	return [root, styles]
 }
 
+const componentIsGlobal = (component?: SelectorComponent) =>
+	component &&
+	component.type === "pseudo-class" &&
+	component.kind === "custom" &&
+	component.name === "global"
+
 const render = async (root: VNode, document: Document): Promise<undefined> => {
 	let styles: Record<string, string>
 	;[root, styles] = await prerender(root)
@@ -157,7 +163,8 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 	const css: string[] = []
 	for (const [scope, rawCss] of Object.entries(styles)) {
-		let wasGlobal = false
+		let contextWasGlobal = false
+		let lastWasGlobal = false
 
 		const { code, map } = transformCss({
 			filename: "style.css",
@@ -166,10 +173,19 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			targets,
 			visitor: {
 				Selector(selector) {
-					if (selector[0].type === "nesting" && wasGlobal) {
-						return selector
+					if (selector[0].type === "nesting") {
+						if (lastWasGlobal) {
+							const idx = selector.findIndex(
+								(c) => c.type !== "nesting" && c.type !== "combinator",
+							)
+							return selector.slice(idx)
+						}
+						if (contextWasGlobal) {
+							return selector
+						}
 					}
-					wasGlobal = false
+					contextWasGlobal = false
+					lastWasGlobal = false
 
 					const scopeSelector: SelectorComponent = {
 						type: "attribute",
@@ -182,22 +198,31 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 					const scoped: SelectorComponent[] = []
 					for (let i = 0; i < selector.length; i++) {
-						const component = selector[i]
-						switch (component.type) {
+						switch (selector[i].type) {
 							case "pseudo-class": {
-								if (
-									component.kind === "custom" &&
-									component.name === "global"
-								) {
-									i++
+								if (componentIsGlobal(selector[i])) {
+									contextWasGlobal = true
+									lastWasGlobal = i === selector.length - 1
+
+									for (
+										i++;
+										i < selector.length &&
+										(selector[i].type === "nesting" ||
+											selector[i].type === "combinator");
+										i++
+									) {}
+
 									if (i < selector.length) {
 										scoped.push(...selector.slice(i))
 									}
-									wasGlobal = true
+
+									if (scoped.length === 0) {
+										scoped.push({ type: "universal" })
+									}
+
 									return scoped
 								}
-
-								scoped.push(component)
+								scoped.push(selector[i])
 								break
 							}
 							case "universal": {
@@ -205,20 +230,21 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 								break
 							}
 							case "type": {
-								scoped.push(component)
+								scoped.push(selector[i])
 								scoped.push(scopeSelector)
 								break
 							}
 							case "class": {
 								scoped.push(scopeSelector)
-								scoped.push(component)
+								scoped.push(selector[i])
 								break
 							}
 							default: {
-								scoped.push(component)
+								scoped.push(selector[i])
 							}
 						}
 					}
+
 					return scoped
 				},
 			},
