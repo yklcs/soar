@@ -11,9 +11,10 @@
   },
   "bin": "./lib/cli.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "biome format --write **/*",
+    "preinstall": "tsc",
+    "prepack": "tsc",
     "build": "tsc",
+    "format": "biome format --write **/*",
     "start": "node ./lib/cli.js"
   },
   "keywords": [],
