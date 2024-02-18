@@ -127,8 +127,12 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 					} else {
 						Object.assign(el.style, val)
 					}
-				} else if (key === "className") {
-					el.setAttribute("class", val?.toString() ?? "")
+				} else if (key === "className" || key === "class") {
+					if (Array.isArray(val)) {
+						el.setAttribute("class", val.join(" ") ?? "")
+					} else {
+						el.setAttribute("class", val?.toString() ?? "")
+					}
 				} else {
 					el.setAttribute(key, val?.toString() ?? "")
 				}
@@ -171,23 +175,39 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 					const scoped: SelectorComponent[] = []
 					for (let i = 0; i < selector.length; i++) {
-						switch (selector[i].type) {
+						const component = selector[i]
+						switch (component.type) {
+							case "pseudo-class": {
+								if (
+									component.kind === "custom" &&
+									component.name === "global"
+								) {
+									i++
+									if (i < selector.length) {
+										scoped.push(...selector.slice(i))
+									}
+									return scoped
+								}
+
+								scoped.push(component)
+								break
+							}
 							case "universal": {
 								scoped.push(scopeSelector)
 								break
 							}
 							case "type": {
-								scoped.push(selector[i])
+								scoped.push(component)
 								scoped.push(scopeSelector)
 								break
 							}
 							case "class": {
 								scoped.push(scopeSelector)
-								scoped.push(selector[i])
+								scoped.push(component)
 								break
 							}
 							default: {
-								scoped.push(selector[i])
+								scoped.push(component)
 							}
 						}
 					}
