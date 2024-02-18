@@ -44,7 +44,7 @@ class Site {
 	async scanFs() {
 		const files = await globby(this.rootdir, {
 			cwd: this.rootdir,
-			gitignore: true,
+			ignoreFiles: [".ignore", ".soarignore"],
 		})
 		this.files = new Map(
 			files.map((file) => [
