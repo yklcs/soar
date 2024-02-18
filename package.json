@@ -4,6 +4,10 @@
   "description": "",
   "main": "./lib/index.js",
   "exports": {
+    ".": {
+      "default": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    },
     "./jsx-runtime": {
       "default": "./jsx-runtime/index.js",
       "types": "./jsx-runtime/index.d.ts"
@@ -37,6 +41,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.5.3",
+    "@types/mdx": "^2.0.11",
     "@types/node": "^20.11.10",
     "typescript": "^5.3.3"
   }

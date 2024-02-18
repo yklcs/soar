@@ -221,15 +221,16 @@ class Site {
 			jsxImportSource: "soar",
 			platform: "node",
 			format: "esm",
-			alias: {
-				soar: path.resolve(import.meta.dirname, ".."),
-			},
+			// alias: {
+			// 	soar: path.resolve(import.meta.dirname, ".."),
+			// },
 			inject: [path.resolve(import.meta.dirname, "./require-shim.js")],
 			plugins: [
 				mdx({
 					jsxImportSource: "soar",
 					remarkPlugins: [remarkMath],
 					rehypePlugins: [rehypeKatex],
+					providerImportSource: "soar",
 				}),
 				{
 					name: "import-meta",
