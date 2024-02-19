@@ -7,9 +7,8 @@ import { renderToString } from "./render.js"
 import fastify, { type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
 import mdx from "@mdx-js/esbuild"
-import remarkMath from "remark-math"
-import rehypeKatex from "rehype-katex"
 import { pathToFileURL } from "node:url"
+import { SoarConfig } from "config.js"
 
 interface File {
 	abs: string
@@ -32,6 +31,7 @@ class Site {
 	rootdir: string
 	outdir: string
 	server?: FastifyInstance
+	config?: SoarConfig
 	engine: string
 
 	constructor(opts: SiteOptions) {
@@ -86,7 +86,25 @@ class Site {
 		)
 	}
 
+	async configure(): Promise<SoarConfig | undefined> {
+		const file = path.join(this.rootdir, "Soar.ts")
+		if (!(await fileExists(file))) {
+			return undefined
+		}
+
+		const output = await esbuild.build(this.esbuildCfg(file))
+		const built = output.outputFiles[0].text
+		const dataUrl = `data:text/javascript;base64,${Buffer.from(built).toString(
+			"base64",
+		)}`
+		const mod = await import(dataUrl)
+
+		this.config = mod.default
+		return this.config
+	}
+
 	async build() {
+		await this.configure()
 		await fs.mkdir(this.outdir, { recursive: true })
 
 		for (const [_, entry] of this.pages()) {
@@ -148,6 +166,7 @@ class Site {
 	}
 
 	async serve() {
+		await this.configure()
 		this.server = fastify({ logger: false })
 		this.server.register(fastifyStatic, {
 			root: this.rootdir,
@@ -221,15 +240,12 @@ class Site {
 			jsxImportSource: "soar",
 			platform: "node",
 			format: "esm",
-			// alias: {
-			// 	soar: path.resolve(import.meta.dirname, ".."),
-			// },
 			inject: [path.resolve(import.meta.dirname, "./require-shim.js")],
 			plugins: [
 				mdx({
 					jsxImportSource: "soar",
-					remarkPlugins: [remarkMath],
-					rehypePlugins: [rehypeKatex],
+					remarkPlugins: this.config?.remarkPlugins,
+					rehypePlugins: this.config?.rehypePlugins,
 					providerImportSource: "soar",
 				}),
 				{

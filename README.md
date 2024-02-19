@@ -14,6 +14,12 @@ $ soar serve src/
 
 ## Basic concepts
 
+### Configuration
+
+Soar does not need a config file for most things, but can be provided with one.
+The default export of `Soar.ts` (with capitalization) in the source directory will be used.
+See [config.ts](./src/config.ts) for available options.
+
 ### Filesystem routing
 
 All `jsx`, `tsx`, and `mdx` files that do not start with an underscore `_` are treated as pages.
