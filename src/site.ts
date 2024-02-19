@@ -4,7 +4,7 @@ import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
 import { JSX, jsx } from "./jsx.js"
 import { renderToString } from "./render.js"
-import fastify, { type FastifyInstance } from "fastify"
+import fastify, { FastifyPluginAsync, type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
 import mdx from "@mdx-js/esbuild"
 import { pathToFileURL } from "node:url"
@@ -14,6 +14,7 @@ interface File {
 	abs: string
 	rel: string
 	ext: string
+	underscore: boolean
 }
 
 type Files = Map<string, File>
@@ -25,6 +26,41 @@ interface SiteOptions {
 }
 
 type Generator = Record<string, JSX.FunctionalElement>
+
+const fastifyEsbuildPlugin: FastifyPluginAsync<{
+	rootdir: string
+	outdir: string
+}> = async (instance, opts) => {
+	instance.addHook("onRequest", async (request, reply) => {
+		if (
+			path.extname(request.url) === ".js" &&
+			!path.basename(request.url).startsWith("_")
+		) {
+			let file = path.join(opts.rootdir, request.url)
+			if (!(await fileExists(file))) {
+				if (await fileExists(withExt(file, ".ts"))) {
+					file = withExt(file, ".ts")
+				} else {
+					return
+				}
+			}
+			const output = await esbuild.build({
+				entryPoints: [file],
+				bundle: true,
+				write: false,
+				platform: "browser",
+				outdir: opts.outdir,
+				outbase: opts.rootdir,
+			})
+			const built = output.outputFiles[0].text
+			reply.type("text/javascript")
+			reply.send(built)
+		}
+	})
+}
+
+// @ts-ignore
+fastifyEsbuildPlugin[Symbol.for("skip-override")] = true
 
 class Site {
 	files: Files
@@ -53,6 +89,7 @@ class Site {
 					abs: file,
 					rel: path.relative(this.rootdir, file),
 					ext: path.extname(file),
+					underscore: path.basename(file).startsWith("_"),
 				},
 			]),
 		)
@@ -84,6 +121,21 @@ class Site {
 				([_, entry]) => ![".tsx", ".jsx", ".mdx", ".md"].includes(entry.ext),
 			),
 		)
+	}
+
+	async script() {
+		for (const [_, file] of this.nonpages().entries()) {
+			if ((file.ext === ".ts" || file.ext === ".js") && !file.underscore) {
+				esbuild.build({
+					entryPoints: [file.abs],
+					bundle: true,
+					write: true,
+					platform: "browser",
+					outdir: this.outdir,
+					outbase: this.rootdir,
+				})
+			}
+		}
 	}
 
 	async configure(): Promise<SoarConfig | undefined> {
@@ -158,15 +210,26 @@ class Site {
 		}
 
 		for (const [filename, entry] of this.nonpages()) {
+			if ((entry.ext === ".ts" || entry.ext === ".js") && !entry.underscore) {
+				continue
+			}
 			await fs.mkdir(path.dirname(path.join(this.outdir, entry.rel)), {
 				recursive: true,
 			})
 			await fs.copyFile(filename, path.join(this.outdir, entry.rel))
 		}
+
+		await this.script()
 	}
 
 	async serve() {
 		this.server = fastify({ logger: false })
+
+		this.server.register(fastifyEsbuildPlugin, {
+			rootdir: this.rootdir,
+			outdir: this.outdir,
+		})
+
 		this.server.register(fastifyStatic, {
 			root: this.rootdir,
 			wildcard: false,
@@ -248,35 +311,37 @@ class Site {
 					rehypePlugins: this.config?.rehypePlugins,
 					providerImportSource: "soar",
 				}),
-				{
-					name: "import-meta",
-					setup(build) {
-						build.onLoad({ filter: /.*/ }, async ({ path: file }) => {
-							let contents = await fs.readFile(file, "utf8")
-
-							const url = pathToFileURL(file)
-							const filename = file
-							const dirname = path.dirname(file)
-
-							contents = contents
-								.replaceAll(
-									"import.meta",
-									JSON.stringify({
-										url,
-										filename,
-										dirname,
-									}),
-								)
-								.replaceAll("__dirname", JSON.stringify(dirname))
-								.replaceAll("__filename", JSON.stringify(filename))
-
-							return { contents, loader: "default" }
-						})
-					},
-				},
+				esbuildPluginImportMeta,
 			],
 		}
 	}
+}
+
+const esbuildPluginImportMeta: esbuild.Plugin = {
+	name: "import-meta",
+	setup(build) {
+		build.onLoad({ filter: /.*/ }, async ({ path: file }) => {
+			let contents = await fs.readFile(file, "utf8")
+
+			const url = pathToFileURL(file)
+			const filename = file
+			const dirname = path.dirname(file)
+
+			contents = contents
+				.replaceAll(
+					"import.meta",
+					JSON.stringify({
+						url,
+						filename,
+						dirname,
+					}),
+				)
+				.replaceAll("__dirname", JSON.stringify(dirname))
+				.replaceAll("__filename", JSON.stringify(filename))
+
+			return { contents, loader: "default" }
+		})
+	},
 }
 
 /**
