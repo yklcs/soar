@@ -166,7 +166,6 @@ class Site {
 	}
 
 	async serve() {
-		await this.configure()
 		this.server = fastify({ logger: false })
 		this.server.register(fastifyStatic, {
 			root: this.rootdir,
@@ -174,6 +173,7 @@ class Site {
 		})
 
 		this.server.get("/*", async (req, res) => {
+			await this.configure()
 			const url = path.normalize(req.url)
 			const src = await findPathFromUrl(url, this.rootdir)
 
