@@ -11,6 +11,10 @@
     "./jsx-runtime": {
       "default": "./jsx-runtime/index.js",
       "types": "./jsx-runtime/index.d.ts"
+    },
+    "./register": {
+      "default": "./lib/register.js",
+      "types": "./lib/register.d.ts"
     }
   },
   "bin": "./lib/cli.js",
@@ -27,7 +31,7 @@
   "type": "module",
   "dependencies": {
     "@fastify/static": "^7.0.0",
-    "@mdx-js/esbuild": "^3.0.0",
+    "@mdx-js/mdx": "^3.0.1",
     "browserslist": "^4.22.3",
     "commander": "^11.1.0",
     "esbuild": "^0.20.0",

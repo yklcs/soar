@@ -6,9 +6,8 @@ import { JSX, jsx } from "./jsx.js"
 import { renderToString } from "./render.js"
 import fastify, { FastifyPluginAsync, type FastifyInstance } from "fastify"
 import fastifyStatic from "@fastify/static"
-import mdx from "@mdx-js/esbuild"
-import { pathToFileURL } from "node:url"
 import { SoarConfig } from "config.js"
+import { register } from "node:module"
 
 interface File {
 	abs: string
@@ -75,6 +74,19 @@ class Site {
 		this.rootdir = path.resolve(opts.rootdir ?? process.cwd())
 		this.outdir = path.resolve(opts.outdir ?? path.join(process.cwd(), "dist"))
 		this.engine = "Soar"
+	}
+
+	async init() {
+		register("./loader/esbuild.js", import.meta.url)
+		register("./loader/mdx.js", {
+			parentURL: import.meta.url,
+			data: {
+				configFile: path.join(this.rootdir, "Soar.ts"),
+			},
+		})
+
+		await this.scanFs()
+		await this.configure()
 	}
 
 	async scanFs() {
@@ -144,28 +156,18 @@ class Site {
 			return undefined
 		}
 
-		const output = await esbuild.build(this.esbuildCfg(file))
-		const built = output.outputFiles[0].text
-		const dataUrl = `data:text/javascript;base64,${Buffer.from(built).toString(
-			"base64",
-		)}`
-		const mod = await import(dataUrl)
-
+		const mod = await import(file)
 		this.config = mod.default
 		return this.config
 	}
 
 	async build() {
+		await this.init()
 		await this.configure()
 		await fs.mkdir(this.outdir, { recursive: true })
 
 		for (const [_, entry] of this.pages()) {
-			const output = await esbuild.build(this.esbuildCfg(entry.abs))
-			const built = output.outputFiles[0].text
-			const dataUrl = `data:text/javascript;base64,${Buffer.from(
-				built,
-			).toString("base64")}`
-			const mod = await import(dataUrl)
+			const mod = await import(entry.abs)
 			const Page = mod.default
 
 			const url = path.resolve("/", resolveIndices(entry.rel))
@@ -184,12 +186,7 @@ class Site {
 		}
 
 		for (const [_, entry] of this.generators()) {
-			const output = await esbuild.build(this.esbuildCfg(entry.abs))
-			const built = output.outputFiles[0].text
-			const dataUrl = `data:text/javascript;base64,${Buffer.from(
-				built,
-			).toString("base64")}`
-			const mod = await import(dataUrl)
+			const mod = await import(entry.abs)
 			const gentor: Generator = mod.default
 
 			for (const [slug, Page] of Object.entries(gentor)) {
@@ -223,6 +220,7 @@ class Site {
 	}
 
 	async serve() {
+		await this.init()
 		this.server = fastify({ logger: false })
 
 		this.server.register(fastifyEsbuildPlugin, {
@@ -243,12 +241,7 @@ class Site {
 			if (src === undefined) {
 				await this.scanFs()
 				for (const entry of this.generators().values()) {
-					const output = await esbuild.build(this.esbuildCfg(entry.abs))
-					const built = output.outputFiles[0].text
-					const dataUrl = `data:text/javascript;base64,${Buffer.from(
-						built,
-					).toString("base64")}`
-					const mod = await import(dataUrl)
+					const mod = await import(entry.abs)
 					const gentor: Generator = mod.default
 
 					for (const [slug, Page] of Object.entries(gentor)) {
@@ -273,12 +266,7 @@ class Site {
 				return
 			}
 
-			const output = await esbuild.build(this.esbuildCfg(src))
-			const built = output.outputFiles[0].text
-			const dataUrl = `data:text/javascript;base64,${Buffer.from(
-				built,
-			).toString("base64")}`
-			const mod = await import(dataUrl)
+			const mod = await import(src)
 			const Page = mod.default
 			const html = await renderToString(
 				jsx(Page, { url, generator: this.engine, children: undefined }),
@@ -290,58 +278,6 @@ class Site {
 
 		this.server.listen({ port: 8000 })
 	}
-
-	esbuildCfg(file: string): esbuild.BuildOptions & { write: false } {
-		const filename = path.resolve(file)
-		const dirname = path.dirname(filename)
-
-		return {
-			entryPoints: [file],
-			bundle: true,
-			write: false,
-			jsx: "automatic",
-			jsxImportSource: "soar",
-			platform: "node",
-			format: "esm",
-			inject: [path.resolve(import.meta.dirname, "./require-shim.js")],
-			plugins: [
-				mdx({
-					jsxImportSource: "soar",
-					remarkPlugins: this.config?.remarkPlugins,
-					rehypePlugins: this.config?.rehypePlugins,
-					providerImportSource: "soar",
-				}),
-				esbuildPluginImportMeta,
-			],
-		}
-	}
-}
-
-const esbuildPluginImportMeta: esbuild.Plugin = {
-	name: "import-meta",
-	setup(build) {
-		build.onLoad({ filter: /.*/ }, async ({ path: file }) => {
-			let contents = await fs.readFile(file, "utf8")
-
-			const url = pathToFileURL(file)
-			const filename = file
-			const dirname = path.dirname(file)
-
-			contents = contents
-				.replaceAll(
-					"import.meta",
-					JSON.stringify({
-						url,
-						filename,
-						dirname,
-					}),
-				)
-				.replaceAll("__dirname", JSON.stringify(dirname))
-				.replaceAll("__filename", JSON.stringify(filename))
-
-			return { contents, loader: "default" }
-		})
-	},
 }
 
 /**

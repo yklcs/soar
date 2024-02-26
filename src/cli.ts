@@ -10,7 +10,6 @@ program
 	.argument("[dir]", "directory", process.cwd())
 	.action(async (dir) => {
 		const site = new Site({ rootdir: dir })
-		await site.scanFs()
 		await site.build()
 	})
 
