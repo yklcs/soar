@@ -5,7 +5,7 @@ import {
 } from "lightningcss"
 import browserslist from "browserslist"
 import { parseHTML } from "linkedom"
-import { JSX, VNode } from "jsx.js"
+import { JSX, VNode } from "./jsx.js"
 
 const renderToString = async (root: VNode): Promise<string> => {
 	const { document } = parseHTML(

@@ -1,5 +1,6 @@
 import { Command } from "commander"
-import { Site } from "./site.js"
+import { Builder } from "./builder.js"
+import { Server } from "./server.js"
 
 const program = new Command().version(process.env.npm_package_version ?? "")
 
@@ -9,8 +10,8 @@ program
 	.description("Build static pages from JSX")
 	.argument("[dir]", "directory", process.cwd())
 	.action(async (dir) => {
-		const site = new Site({ rootdir: dir })
-		await site.build()
+		const builder = new Builder({ rootdir: dir })
+		await builder.build()
 	})
 
 program
@@ -19,8 +20,8 @@ program
 	.description("Serve Soar site")
 	.argument("[dir]", "directory", process.cwd())
 	.action(async (dir) => {
-		const site = new Site({ rootdir: dir })
-		await site.serve()
+		const server = new Server({ rootdir: dir })
+		await server.serve()
 	})
 
 program.parse(process.argv)

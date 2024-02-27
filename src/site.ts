@@ -1,78 +1,67 @@
 import { globby } from "globby"
 import * as path from "node:path"
-import * as esbuild from "esbuild"
 import * as fs from "node:fs/promises"
-import { JSX, jsx } from "./jsx.js"
-import { renderToString } from "./render.js"
-import fastify, { FastifyPluginAsync, type FastifyInstance } from "fastify"
-import fastifyStatic from "@fastify/static"
-import { SoarConfig } from "config.js"
+import type { JSX } from "./jsx.js"
+import type { SoarConfig } from "config.js"
 import { register } from "node:module"
 
 interface File {
 	abs: string
 	rel: string
 	ext: string
+
 	underscore: boolean
+	type: FileType
 }
 
-type Files = Map<string, File>
+type FileType =
+	| "page"
+	| "generator"
+	| "style"
+	| "script"
+	| "unknown"
+	| "ignored"
 
 interface SiteOptions {
 	rootdir?: string
-	builddir?: string
-	outdir?: string
 }
 
-type Generator = Record<string, JSX.FunctionalElement>
+type Page = JSX.FunctionalElement<JSX.PageProps>
+type Generator = Record<string, Page>
 
-const fastifyEsbuildPlugin: FastifyPluginAsync<{
-	rootdir: string
-	outdir: string
-}> = async (instance, opts) => {
-	instance.addHook("onRequest", async (request, reply) => {
-		if (
-			path.extname(request.url) === ".js" &&
-			!path.basename(request.url).startsWith("_")
-		) {
-			let file = path.join(opts.rootdir, request.url)
-			if (!(await fileExists(file))) {
-				if (await fileExists(withExt(file, ".ts"))) {
-					file = withExt(file, ".ts")
-				} else {
-					return
-				}
+const fileType = (basename: string): FileType => {
+	switch (path.extname(basename)) {
+		case ".jsx":
+		case ".tsx": {
+			if (withExt(basename, "") === "_") {
+				return "generator"
 			}
-			const output = await esbuild.build({
-				entryPoints: [file],
-				bundle: true,
-				write: false,
-				platform: "browser",
-				outdir: opts.outdir,
-				outbase: opts.rootdir,
-			})
-			const built = output.outputFiles[0].text
-			reply.type("text/javascript")
-			reply.send(built)
+			if (basename.startsWith("_")) {
+				return "ignored"
+			}
+			return "page"
 		}
-	})
+		case ".mdx":
+			return "page"
+		case ".css":
+			return "style"
+		case ".ts":
+		case ".js":
+			return "script"
+		default:
+			return "unknown"
+	}
 }
-
-// @ts-ignore
-fastifyEsbuildPlugin[Symbol.for("skip-override")] = true
 
 class Site {
-	files: Files
+	_files: File[]
 	rootdir: string
-	outdir: string
-	server?: FastifyInstance
 	config?: SoarConfig
 	engine: string
 
 	constructor(opts: SiteOptions) {
-		this.files = new Map()
+		this._files = []
 		this.rootdir = path.resolve(opts.rootdir ?? process.cwd())
-		this.outdir = path.resolve(opts.outdir ?? path.join(process.cwd(), "dist"))
 		this.engine = "Soar"
 	}
 
@@ -85,69 +74,26 @@ class Site {
 			},
 		})
 
-		await this.scanFs()
+		await this.scanFiles()
 		await this.configure()
 	}
 
-	async scanFs() {
+	async scanFiles() {
 		const files = await globby(this.rootdir, {
 			cwd: this.rootdir,
 			ignoreFiles: [".ignore", ".soarignore"],
 		})
-		this.files = new Map(
-			files.map((file) => [
-				file,
-				{
-					abs: file,
-					rel: path.relative(this.rootdir, file),
-					ext: path.extname(file),
-					underscore: path.basename(file).startsWith("_"),
-				},
-			]),
-		)
+		this._files = files.map((file) => ({
+			abs: file,
+			rel: path.relative(this.rootdir, file),
+			ext: path.extname(file),
+			type: fileType(path.basename(file)),
+			underscore: path.basename(file).startsWith("_"),
+		}))
 	}
 
-	pages(): Files {
-		return new Map(
-			[...this.files.entries()].filter(
-				([_, entry]) =>
-					[".tsx", ".jsx", ".mdx", ".md"].includes(entry.ext) &&
-					!path.basename(entry.abs).startsWith("_"),
-			),
-		)
-	}
-
-	generators(): Files {
-		return new Map(
-			[...this.files.entries()].filter(
-				([_, entry]) =>
-					[".tsx", ".jsx"].includes(entry.ext) &&
-					withExt(path.basename(entry.abs), "") === "_",
-			),
-		)
-	}
-
-	nonpages(): Files {
-		return new Map(
-			[...this.files.entries()].filter(
-				([_, entry]) => ![".tsx", ".jsx", ".mdx", ".md"].includes(entry.ext),
-			),
-		)
-	}
-
-	async script() {
-		for (const [_, file] of this.nonpages().entries()) {
-			if ((file.ext === ".ts" || file.ext === ".js") && !file.underscore) {
-				esbuild.build({
-					entryPoints: [file.abs],
-					bundle: true,
-					write: true,
-					platform: "browser",
-					outdir: this.outdir,
-					outbase: this.rootdir,
-				})
-			}
-		}
+	files(type?: FileType): File[] {
+		return type ? this._files.filter((file) => file.type === type) : this._files
 	}
 
 	async configure(): Promise<SoarConfig | undefined> {
@@ -156,167 +102,15 @@ class Site {
 			return undefined
 		}
 
-		const mod = await import(file)
-		this.config = mod.default
+		const { default: config }: { default?: SoarConfig } = await import(file)
+		this.config = config
+
 		return this.config
 	}
-
-	async build() {
-		await this.init()
-		await this.configure()
-		await fs.mkdir(this.outdir, { recursive: true })
-
-		for (const [_, entry] of this.pages()) {
-			const mod = await import(entry.abs)
-			const Page = mod.default
-
-			const url = path.resolve("/", resolveIndices(entry.rel))
-			const props: JSX.PageProps = { url, generator: this.engine }
-			const html = await renderToString(
-				jsx(Page, {
-					url,
-					generator: this.engine,
-					children: undefined,
-				}),
-			)
-
-			const file = path.join(this.outdir, url, "index.html")
-			await fs.mkdir(path.dirname(file), { recursive: true })
-			await fs.writeFile(file, html)
-		}
-
-		for (const [_, entry] of this.generators()) {
-			const mod = await import(entry.abs)
-			const gentor: Generator = mod.default
-
-			for (const [slug, Page] of Object.entries(gentor)) {
-				const url = path.join("/", path.dirname(entry.rel), slug)
-				const props: JSX.PageProps = { url, generator: this.engine }
-				const html = await renderToString(
-					jsx(Page, {
-						url,
-						generator: this.engine,
-						children: undefined,
-					}),
-				)
-
-				const file = path.join(this.outdir, url, "index.html")
-				await fs.mkdir(path.dirname(file), { recursive: true })
-				await fs.writeFile(file, html)
-			}
-		}
-
-		for (const [filename, entry] of this.nonpages()) {
-			if ((entry.ext === ".ts" || entry.ext === ".js") && !entry.underscore) {
-				continue
-			}
-			await fs.mkdir(path.dirname(path.join(this.outdir, entry.rel)), {
-				recursive: true,
-			})
-			await fs.copyFile(filename, path.join(this.outdir, entry.rel))
-		}
-
-		await this.script()
-	}
-
-	async serve() {
-		await this.init()
-		this.server = fastify({ logger: false })
-
-		this.server.register(fastifyEsbuildPlugin, {
-			rootdir: this.rootdir,
-			outdir: this.outdir,
-		})
-
-		this.server.register(fastifyStatic, {
-			root: this.rootdir,
-			wildcard: false,
-		})
-
-		this.server.get("/*", async (req, res) => {
-			await this.configure()
-			const url = path.normalize(req.url)
-			const src = await findPathFromUrl(url, this.rootdir)
-
-			if (src === undefined) {
-				await this.scanFs()
-				for (const entry of this.generators().values()) {
-					const mod = await import(entry.abs)
-					const gentor: Generator = mod.default
-
-					for (const [slug, Page] of Object.entries(gentor)) {
-						if (url === path.join("/", path.dirname(entry.rel), slug)) {
-							const props: JSX.PageProps = { url, generator: this.engine }
-							const html = await renderToString(
-								jsx(Page, {
-									url,
-									generator: this.engine,
-									children: undefined,
-								}),
-							)
-
-							res.type("text/html")
-							res.send(html)
-							return
-						}
-					}
-				}
-
-				res.callNotFound()
-				return
-			}
-
-			const mod = await import(src)
-			const Page = mod.default
-			const html = await renderToString(
-				jsx(Page, { url, generator: this.engine, children: undefined }),
-			)
-
-			res.type("text/html")
-			res.send(html)
-		})
-
-		this.server.listen({ port: 8000 })
-	}
-}
-
-/**
- * Resolves possible indices in paths.
- */
-const resolveIndices = (file: string) => {
-	const noExt = withExt(file, "")
-	if (path.basename(noExt) === "index") {
-		return stripTrailingSlash(path.dirname(noExt))
-	}
-	return noExt
 }
 
 const stripTrailingSlash = (str: string) => {
 	return str.replace(/\/+$/g, "")
-}
-
-const findPathFromUrl = async (
-	url: string,
-	root: string,
-): Promise<string | undefined> => {
-	const joined = path.join(root, url)
-	const resolved = resolveIndices(joined)
-	const extnames = [".tsx", ".jsx", ".mdx", ".md"]
-	const basenames = extnames.map((ext) => `index${ext}`)
-
-	for (const extname of extnames) {
-		const file = withExt(resolved, extname)
-		if (await fileExists(file)) {
-			return file
-		}
-	}
-
-	for (const basename of basenames) {
-		const file = path.join(resolved, basename)
-		if (await fileExists(file)) {
-			return file
-		}
-	}
 }
 
 const withExt = (file: string, ext: string) =>
@@ -332,4 +126,5 @@ const fileExists = async (file: string) => {
 		.catch(() => false)
 }
 
-export { Site, type SiteOptions, type Generator }
+export { Site, stripTrailingSlash, withExt, fileExists }
+export type { SiteOptions, FileType, File, Page, Generator }
