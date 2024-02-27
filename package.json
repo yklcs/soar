@@ -11,6 +11,10 @@
   ],
   "author": "Lucas Yunkyu Lee <lucas@yklcs.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yklcs/soar.git"
+  },
   "exports": {
     ".": {
       "default": "./lib/index.js",
