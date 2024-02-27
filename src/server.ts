@@ -20,7 +20,6 @@ class Server extends Site {
 
 		this.server.get("*", async (req, res, next) => {
 			const file = this.urlToFile(req.url)
-			console.log(req.url, file)
 			if (!file) {
 				for (const file of this.files("generator")) {
 					const { default: generator }: { default: Generator } = await import(
