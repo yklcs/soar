@@ -2,18 +2,27 @@ import type { LoadHook, ResolveHook } from "node:module"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 import * as esbuild from "esbuild"
-import { readFile, stat } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 
 const needsTransform = ["ts", "tsx", "jsx"]
+
+let i = 0
 
 const resolve: ResolveHook = async (url, ctx, nextHook) => {
 	const next = await nextHook(url)
 	const urlurl = new URL(next.url)
-	if (urlurl.protocol === "file:") {
-		const fstat = await stat(fileURLToPath(next.url))
-		urlurl.searchParams.set("mtime", String(fstat.mtime.valueOf()))
+
+	if (
+		ctx.parentURL &&
+		urlurl.protocol === "file:" &&
+		!urlurl.pathname.includes("/node_modules/")
+	) {
+		const parentUrl = new URL(ctx.parentURL)
+		const reload = parentUrl.searchParams.get("reload") ?? String(i++)
+		urlurl.searchParams.set("reload", reload)
 		next.url = urlurl.href
 	}
+
 	return next
 }
 
