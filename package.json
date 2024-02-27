@@ -1,33 +1,32 @@
 {
   "name": "soar",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.1.0",
+  "description": "Soar, a minimal opinionated static site generator.",
   "main": "./lib/index.js",
+  "bin": "./lib/cli.js",
+  "keywords": [
+    "static site generator",
+    "ssg",
+    "jsx"
+  ],
+  "author": "Lucas Yunkyu Lee <lucas@yklcs.com>",
+  "license": "MIT",
   "exports": {
     ".": {
       "default": "./lib/index.js",
       "types": "./lib/index.d.ts"
     },
     "./jsx-runtime": {
-      "default": "./jsx-runtime/index.js",
-      "types": "./jsx-runtime/index.d.ts"
-    },
-    "./register": {
-      "default": "./lib/register.js",
-      "types": "./lib/register.d.ts"
+      "default": "./lib/jsx.js",
+      "types": "./lib/jsx.d.ts"
     }
   },
-  "bin": "./lib/cli.js",
   "scripts": {
-    "preinstall": "tsc",
     "prepack": "tsc",
     "build": "tsc",
     "format": "biome format --write **/*",
     "start": "node ./lib/cli.js"
   },
-  "keywords": [],
-  "author": "Lucas Yunkyu Lee <lucas@yklcs.com>",
-  "license": "ISC",
   "type": "module",
   "dependencies": {
     "@mdx-js/mdx": "^3.0.1",
@@ -49,5 +48,13 @@
     "@types/serve-static": "^1.15.5",
     "typescript": "^5.3.3",
     "unified": "^11.0.4"
-  }
+  },
+  "files": [
+    "lib/",
+    "src/",
+    "LICENSE.txt",
+    "package.json",
+    "tsconfig.json",
+    "README.md"
+  ]
 }

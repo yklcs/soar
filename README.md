@@ -1,10 +1,14 @@
 # Soar
 
-Soar is an opinionated static site generator built around JSX and filesystem routing.
+Soar is a minimal opinionated static site generator built around JSX and filesystem routing.
 
 ## Usage
 
 ```shell
+# install (global)
+$ npm i -g soar
+$ pnpm i -g soar
+
 # build site
 $ soar build src/
 
