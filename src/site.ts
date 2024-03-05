@@ -147,6 +147,12 @@ class Server extends Site {
 			}
 
 			const fn = this.tree[req.url]
+
+			if (fn === undefined) {
+				error(`404 ${req.url}`)
+				return res.sendStatus(400)
+			}
+
 			res.contentType(path.basename(req.url))
 			try {
 				res.send(await fn())
@@ -154,14 +160,14 @@ class Server extends Site {
 				error(`Error serving ${req.url}:`)
 				if (err instanceof Error) {
 					err.stack && error(err.stack)
-					res.status(404).send(err.stack)
+					res.status(500).send(err.stack)
 				} else {
-					res.sendStatus(404)
+					res.sendStatus(500)
 				}
 			}
 		})
 
-		log(`Starting dev server on http://localhost:${this.port}`)
+		log(`Starting dev server at http://localhost:${this.port}`)
 		this.server.use(serveStatic(this.rootdir))
 		this.server.listen({ port: this.port })
 	}
