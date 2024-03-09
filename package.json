@@ -26,7 +26,7 @@
     }
   },
   "scripts": {
-    "prepack": "tsc",
+    "prepack": "pnpm run build",
     "build": "tsc",
     "format": "biome format --write **/*",
     "start": "node ./lib/cli.js"
