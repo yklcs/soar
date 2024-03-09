@@ -2,7 +2,13 @@
 
 Soar is a minimal opinionated static site generator built around JSX and filesystem routing.
 
-It provides an opinionated core with extensibility.
+Core ideas:
+
+- Embrace JSX without serving client-side JS
+- Leverage ES modules and Node's [custom module hooks](https://nodejs.org/api/module.html)
+- Filesystem routing
+- Scoped styles through CSS-in-JS and CSS modules
+- Scripts and styles must be included explicitly to keep sites lean (manual `<script>` and `<link>` tags)
 
 ## Usage
 
@@ -18,49 +24,59 @@ $ soar build src/
 $ soar serve src/
 ```
 
-## Basic concepts
-
-### ES modules and custom import hooks
-
-Soar is built around ES modules with [Node's custom import hooks](https://nodejs.org/api/module.html#customization-hooks).
-This means that TypeScript, JSX, and MDX files can be used with an `import` statement like any other file.
-
-Additional import hooks can be specified with the `importHooks` option in the configuration file.
-
-### Configuration
+## Configuration
 
 Soar does not need a config file for most things, but can be provided with one.
-The default export of `Soar.ts` (with capitalization) in the source directory will be used.
+The default export of `Soar.ts` in the source directory will be used.
 See [config.ts](./src/config.ts) for available options.
 
-### Filesystem routing
+## Filesystem routing
 
 The file tree within the source directory is used for building the output site.
-This means all routing will be done
+This makes routing simple as creating a directory structure.
+There are three exceptions to this rule:
 
-All `jsx`, `tsx`, and `mdx` files that do not start with an underscore `_` are treated as pages.
-This means that `page.jsx` and `page/index.jsx` are built into `page/index.html`.
-Pages should `export default` a JSX component.
+1. Files and directories beginning with an underscore `_` are not included in the output.
+   This can be used to exclude `_component.tsx` files from the output.
+2. Pages are built into `$PAGE/index.html` and not `$PAGE.html`.
+3. `ignore`d patterns in the `Soar.ts` config file are not included in the output.
 
-All files in the source directory that are not `jsx`, `tsx`, or `mdx` files are copied to the output directory while maintaining their paths.
+## Pipelines
 
-### Programmatic pages
+Pipelines transform source files before building and serving.
 
-`create()` is exported from `soar` and can be used to programatically create a page.
+### JSX pipeline
 
-### Styling
+The JSX pipeline treats `.tsx` and `.jsx` files with a `default` export as pages.
+A [custom JSX runtime](./src/jsx.ts) is used to render JSX into HTML. Only functional elements are supported.
 
-Styling is performed through the `.styled` method on JSX nodes. For example:
+Component and layout files can be created without getting treated as pages by prefixing the file or directory name with an underscore (`_component.tsx`).
+
+Attributes in JSX are passed through to HTML, except for those starting with an underscore `_`.
+
+Props in JSX are never passed to HTML implicitly.
+For example, classes must be directly applied to the inner HTML element for `<Component class={class}>`.
+
+Basic example:
 
 ```tsx
-const BlueText = ({ children }) => (<span>{children}</span>).styled`
-  span {
-    color: blue
-  }
-`;
+import Layout from "./_layout.tsx";
+
+export default () => (
+  <Layout>
+    <h1 id="hello-world">Hello world!</h1>
+  </Layout>
+);
 ```
 
-Styles are automatically scoped.
+#### Styling
+
+##### CSS-in-JS with `.styled`
+
+Styles created with `.styled` method on JSX nodes are automatically scoped and inlined into HTML.
+This CSS-in-JS tranform is done at build time without client-side JS.
+
+For example:
 
 ```tsx
 const Red = () => (<span>This is red</span>).styled`
@@ -83,31 +99,33 @@ const Component = () =>
   }`;
 ```
 
-### Pipeline
+##### CSS files and CSS modules
 
-Soar works with a pipeline.
-A pipeline takes an input file path as argument and returns `Action[]`s.
+Stylesheets can be created directly through CSS files. See [the CSS pipeline](#css-pipeline).
 
-1. `import` with custom import hook
-2. Run pipeline on imported result
-3. Build or serve result
+##### Inline styles
 
-```ts
-const { default: page } = await import("page.tsx")
-const html = pipeline(page)
-write(html)
+Inline styling can be done through the `style` attribute, which supports both HTML-like string styles and JS-like object styles.
+
+### CSS pipeline
+
+`.css` files are bundled and transformed with [Lightning CSS](https://lightningcss.dev).
+These files must be included in pages explicitly with `<link>` tags, like you would do for an HTML file.
+The CSS pipeline supports CSS modules:
+
+```tsx
+import styles from "./styles.css";
+
+// <span class="xxxxxx_red">
+const Red = ({ children }) => <span class={styles.red}>{children}</span>;
 ```
 
-The result of a pipeline is `Action[]`, where `Action` represents an atomic transaction modifying the site state.
+### MDX pipeline
 
-```ts
-interface Action {
-  type: "create" | "delete" | "update",
-  target: string
-  data: string
-}
-```
+`.mdx` files are built into JSX and the [JSX pipeline](#jsx-pipeline) is applied.
+Custom `remark` and `rehype` plugins can be specified in [the config file](#configuration).
 
-### Creating pages programatically
+## JS pipeline
 
-You can create pages programatically with `create`.
+`.ts` and `.js` files are bundled and built into `.js` files.
+These JS files must be included in pages explicitly with `<link>` tags, like you would do for an HTML file.
