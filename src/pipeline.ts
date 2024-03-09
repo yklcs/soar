@@ -4,6 +4,8 @@ import { jsx as jsx_ } from "./jsx.js"
 import { resolveIndexFile, withExt } from "./path.js"
 import type { File, Page } from "./site.js"
 import * as esbuild from "esbuild"
+import { browserslistToTargets, bundle as bundleCss } from "lightningcss"
+import browserslist from "browserslist"
 
 type Action =
 	| {
@@ -55,12 +57,27 @@ const jsx: Pipeline = (file) => {
 	return [{ type: "create", url: indexHtml, fn }]
 }
 
+const targets = browserslistToTargets(browserslist(">= 0.25%"))
+
+const css: Pipeline = (file) => {
+	const fn = async () => {
+		const { code } = bundleCss({
+			filename: file.abs,
+			cssModules: true,
+			targets,
+		})
+		return Buffer.from(code)
+	}
+	return [{ type: "create", url: file.rel, fn }]
+}
+
 const pipeline: Record<string, Pipeline> = {
 	".js": js,
 	".ts": js,
 	".jsx": jsx,
 	".tsx": jsx,
 	".mdx": jsx,
+	".css": css,
 }
 
 export default pipeline
