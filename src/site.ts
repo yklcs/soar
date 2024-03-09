@@ -16,7 +16,6 @@ interface File {
 	abs: string
 	rel: string
 	ext: string
-
 	underscore: boolean
 }
 
@@ -57,7 +56,7 @@ class Site {
 		const files = await globby("**/*", {
 			cwd: this.rootdir,
 			absolute: true,
-			ignore: [...(this.config?.ignore ?? []), "_*", "Soar.ts"],
+			ignore: [...(this.config?.ignore ?? []), "Soar.ts"],
 		})
 		this.files = files.map((file) => ({
 			abs: file,

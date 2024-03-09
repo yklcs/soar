@@ -9,6 +9,7 @@ Core ideas:
 - Filesystem routing
 - Scoped styles through CSS-in-JS and CSS modules
 - Scripts and styles must be included explicitly to keep sites lean (manual `<script>` and `<link>` tags)
+- Extensible pipelines per file type
 
 ## Usage
 
@@ -34,16 +35,16 @@ See [config.ts](./src/config.ts) for available options.
 
 The file tree within the source directory is used for building the output site.
 This makes routing simple as creating a directory structure.
-There are three exceptions to this rule:
+There are two exceptions to this rule:
 
-1. Files and directories beginning with an underscore `_` are not included in the output.
-   This can be used to exclude `_component.tsx` files from the output.
-2. Pages are built into `$PAGE/index.html` and not `$PAGE.html`.
-3. `ignore`d patterns in the `Soar.ts` config file are not included in the output.
+1. Pages are built into `$PAGE/index.html` and not `$PAGE.html`.
+2. `ignore`d patterns in the `Soar.ts` config file are not included in the output.
 
 ## Pipelines
 
 Pipelines transform source files before building and serving.
+Pipelines are applied according to the file extension.
+Files beginning with an underscore `_` are not passed through any pipelines, and are copied as-is.
 
 ### JSX pipeline
 
