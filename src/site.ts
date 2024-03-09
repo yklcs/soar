@@ -44,6 +44,7 @@ class Site {
 
 	async register() {
 		register("./loader/esbuild.js", import.meta.url)
+		register("./loader/css.js", import.meta.url)
 		register("./loader/mdx.js", {
 			parentURL: import.meta.url,
 			data: {
@@ -53,9 +54,10 @@ class Site {
 	}
 
 	async scanFiles() {
-		const files = await globby(this.rootdir, {
+		const files = await globby("**/*", {
 			cwd: this.rootdir,
-			ignoreFiles: [".ignore", ".soarignore"],
+			absolute: true,
+			ignore: [...(this.config?.ignore ?? []), "_*", "Soar.ts"],
 		})
 		this.files = files.map((file) => ({
 			abs: file,
@@ -80,8 +82,8 @@ class Site {
 
 	async process() {
 		await this.register()
-		await this.scanFiles()
 		await this.configure()
+		await this.scanFiles()
 
 		for (const file of this.files) {
 			if (file.underscore) {
@@ -190,7 +192,7 @@ class Builder extends Site {
 	async build() {
 		const spinner = ora({
 			text: "Building site",
-			prefixText: chalk.blue("[Soar]")
+			prefixText: chalk.blue("[Soar]"),
 		}).start()
 
 		for (const [file, fn] of Object.entries(this.tree)) {
