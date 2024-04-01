@@ -23,21 +23,27 @@ const digest = async (message: string, length: number) => {
 	return hashHex.slice(0, length)
 }
 
-type RenderedNode = Node | RenderedNode[]
+type RenderedNode = null | Node | RenderedNode[]
 
 const formatChildren = (children: JSX.Children): string => {
-	if (Array.isArray(children)) {
-		return `[${children.map(formatChildren).join(" ")}]`
-	} else if (typeof children === "string") {
-		return ""
-	} else if (typeof children.type === "string") {
-		return `${children.type}-${children.id}`
-	} else if (typeof children.type === "function") {
-		return `${children.type.name}-${children.id}`
-	} else {
+	if (typeof children === "boolean" || children === undefined || children === null) {
 		return ""
 	}
+	if (Array.isArray(children)) {
+		return `[${children.map(formatChildren).join(" ")}]`
+	}
+	if (typeof children === "string") {
+		return ""
+	}
+	if (typeof children.type === "string") {
+		return `${children.type}-${children.id}`
+	}
+	if (typeof children.type === "function") {
+		return `${children.type.name}-${children.id}`
+	}
+	return ""
 }
+
 
 const prerender = async (
 	root: VNode,
@@ -48,6 +54,10 @@ const prerender = async (
 		depth: number,
 		scope: string,
 	): Promise<JSX.Children> => {
+		if (node === true || node === false || node === undefined || node === null) {
+			return node
+		}
+
 		if (Array.isArray(node)) {
 			const children = []
 			for (const child of node) {
@@ -91,13 +101,17 @@ const componentIsGlobal = (component?: SelectorComponent) =>
 
 const render = async (root: VNode, document: Document): Promise<undefined> => {
 	let styles: Record<string, string>
-	;[root, styles] = await prerender(root)
+		;[root, styles] = await prerender(root)
 
 	const _render = async (
 		node: JSX.Children,
 		parent: Node,
 		depth: number,
 	): Promise<RenderedNode> => {
+		if (node === true || node === false || node === undefined || node === null) {
+			return null
+		}
+
 		if (Array.isArray(node)) {
 			const rendered = []
 			for (const child of node) {
@@ -210,7 +224,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 										(selector[i].type === "nesting" ||
 											selector[i].type === "combinator");
 										i++
-									) {}
+									) { }
 
 									if (i < selector.length) {
 										scoped.push(...selector.slice(i))

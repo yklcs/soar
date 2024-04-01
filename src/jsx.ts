@@ -35,7 +35,7 @@ const Fragment = <P extends { children: JSX.Children }>({ children }: P) =>
 	children
 
 declare namespace JSX {
-	type Children = string | VNode | Children[]
+	type Children = boolean | undefined | null | string | VNode | Children[]
 
 	interface PageProps {
 		url: string
