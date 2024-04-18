@@ -1,4 +1,5 @@
 import type { MDXComponents } from "mdx/types.js"
+
 export type { SoarConfig } from "./config.js"
 
 let mdxComponents = {}

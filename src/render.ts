@@ -1,10 +1,11 @@
+import browserslist from "browserslist"
 import {
 	SelectorComponent,
 	browserslistToTargets,
 	transform as transformCss,
 } from "lightningcss"
-import browserslist from "browserslist"
 import { parseHTML } from "linkedom"
+
 import { JSX, VNode } from "./jsx.js"
 
 const renderToString = async (root: VNode): Promise<string> => {
@@ -26,7 +27,11 @@ const digest = async (message: string, length: number) => {
 type RenderedNode = null | Node | RenderedNode[]
 
 const formatChildren = (children: JSX.Children): string => {
-	if (typeof children === "boolean" || children === undefined || children === null) {
+	if (
+		typeof children === "boolean" ||
+		children === undefined ||
+		children === null
+	) {
 		return ""
 	}
 	if (Array.isArray(children)) {
@@ -44,7 +49,6 @@ const formatChildren = (children: JSX.Children): string => {
 	return ""
 }
 
-
 const prerender = async (
 	root: VNode,
 ): Promise<[VNode, Record<string, string>]> => {
@@ -54,7 +58,12 @@ const prerender = async (
 		depth: number,
 		scope: string,
 	): Promise<JSX.Children> => {
-		if (node === true || node === false || node === undefined || node === null) {
+		if (
+			node === true ||
+			node === false ||
+			node === undefined ||
+			node === null
+		) {
 			return node
 		}
 
@@ -101,14 +110,19 @@ const componentIsGlobal = (component?: SelectorComponent) =>
 
 const render = async (root: VNode, document: Document): Promise<undefined> => {
 	let styles: Record<string, string>
-		;[root, styles] = await prerender(root)
+	;[root, styles] = await prerender(root)
 
 	const _render = async (
 		node: JSX.Children,
 		parent: Node,
 		depth: number,
 	): Promise<RenderedNode> => {
-		if (node === true || node === false || node === undefined || node === null) {
+		if (
+			node === true ||
+			node === false ||
+			node === undefined ||
+			node === null
+		) {
 			return null
 		}
 
@@ -224,7 +238,7 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 										(selector[i].type === "nesting" ||
 											selector[i].type === "combinator");
 										i++
-									) { }
+									) {}
 
 									if (i < selector.length) {
 										scoped.push(...selector.slice(i))

@@ -1,11 +1,13 @@
-import path from "node:path"
-import { renderToString } from "./render.js"
-import { jsx as jsx_ } from "./jsx.js"
-import { resolveIndexFile, withExt } from "./path.js"
-import type { File, Page } from "./site.js"
+import browserslist from "browserslist"
 import * as esbuild from "esbuild"
 import { browserslistToTargets, bundle as bundleCss } from "lightningcss"
-import browserslist from "browserslist"
+
+import path from "node:path"
+
+import { jsx as jsx_ } from "./jsx.js"
+import { resolveIndexFile, withExt } from "./path.js"
+import { renderToString } from "./render.js"
+import type { File, Page } from "./site.js"
 
 type Action =
 	| {

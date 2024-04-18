@@ -1,6 +1,7 @@
 import { Command } from "commander"
-import { Server, Builder } from "./site.js"
+
 import { log } from "./log.js"
+import { Builder, Server } from "./site.js"
 
 const program = new Command().version(process.env.npm_package_version ?? "")
 

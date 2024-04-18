@@ -1,16 +1,18 @@
-import { globby } from "globby"
-import * as path from "node:path"
-import type { JSX } from "./jsx.js"
-import type { SoarConfig } from "config.js"
-import { register } from "node:module"
-import * as fs from "node:fs/promises"
-import { existsSync } from "node:fs"
-import { type Action, default as pipeline } from "./pipeline.js"
-import express, { type Application } from "express"
-import serveStatic from "serve-static"
-import { error, log } from "./log.js"
-import ora from "ora"
 import chalk from "chalk"
+import type { SoarConfig } from "config.js"
+import express, { type Application } from "express"
+import { globby } from "globby"
+import ora from "ora"
+import serveStatic from "serve-static"
+
+import { existsSync } from "node:fs"
+import * as fs from "node:fs/promises"
+import { register } from "node:module"
+import * as path from "node:path"
+
+import type { JSX } from "./jsx.js"
+import { error, log } from "./log.js"
+import { type Action, default as pipeline } from "./pipeline.js"
 
 interface File {
 	abs: string

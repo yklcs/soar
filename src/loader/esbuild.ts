@@ -1,8 +1,9 @@
+import * as esbuild from "esbuild"
+
+import { readFile } from "node:fs/promises"
 import type { LoadHook, ResolveHook } from "node:module"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
-import * as esbuild from "esbuild"
-import { readFile } from "node:fs/promises"
 
 const needsTransform = ["ts", "tsx", "jsx"]
 

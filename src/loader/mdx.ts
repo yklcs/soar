@@ -1,10 +1,11 @@
+import * as mdx from "@mdx-js/mdx"
+import type { SoarConfig } from "config.js"
+import * as esbuild from "esbuild"
+
+import { readFile } from "node:fs/promises"
 import type { InitializeHook, LoadHook } from "node:module"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
-import * as mdx from "@mdx-js/mdx"
-import { readFile } from "node:fs/promises"
-import type { SoarConfig } from "config.js"
-import * as esbuild from "esbuild"
 
 interface MdxLoaderData {
 	configFile: string
