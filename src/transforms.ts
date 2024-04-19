@@ -5,7 +5,7 @@ import { browserslistToTargets, bundle as bundleCss } from "lightningcss"
 import path from "node:path"
 
 import { jsx as jsx_ } from "./jsx.js"
-import { resolveIndexFile, withExt } from "./path.js"
+import { resolveIndexFile, stripTrailingSlash, withExt } from "./path.js"
 import { renderToString } from "./render.js"
 import type { File, Page } from "./site.js"
 
@@ -52,8 +52,9 @@ const contentTransforms: Record<string, ContentTransform> = {
 	page: {
 		content: async (file) => {
 			const { default: page }: { default: Page } = await import(file.file)
+			const url = stripTrailingSlash(path.resolve("/", path.dirname(file.path)))
 			const props = {
-				url: path.resolve("/", file.path),
+				url,
 				generator: "Soar",
 				children: undefined,
 			}
