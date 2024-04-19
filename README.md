@@ -61,43 +61,48 @@ For example, classes must be directly applied to the inner HTML element for `<Co
 Basic example:
 
 ```tsx
-import Layout from "./_layout.tsx";
+import Layout from "./_layout.tsx"
 
 export default () => (
-  <Layout>
-    <h1 id="hello-world">Hello world!</h1>
-  </Layout>
-);
+	<Layout>
+		<h1 id="hello-world">Hello world!</h1>
+	</Layout>
+)
 ```
 
 #### Styling
 
-##### CSS-in-JS with `.styled`
+##### CSS-in-JS with `css`
 
-Styles created with `.styled` method on JSX nodes are automatically scoped and inlined into HTML.
+Styles created with `css` and spread onto JSX nodes are automatically scoped and inlined into HTML.
 This CSS-in-JS tranform is done at build time without client-side JS.
 
 For example:
 
 ```tsx
-const Red = () => (<span>This is red</span>).styled`
-  span {
-    color: red;
-  }`;
+import { css } from "soar"
 
-const Component = () =>
-  (
-    <div>
-      <span>This is blue</span>
-      <Red />
-      {(<span>This is green</span>).styled`
-        span { color: green; }
-      `}
-    </div>
-  ).styled`
-  span {
-    color: blue
-  }`;
+const styles = {
+	red: css`
+		color: red;
+	`,
+	green: css`
+		color: green;
+	`,
+}
+
+const Red = () => <span {...styles.red}>This is red</span>
+const Component = () => (
+	<div
+		{...css`
+			color: blue;
+		`}
+	>
+		<span>This is blue</span>
+		<Red />
+		<span {...styles.green}>This is green</span>
+	</div>
+)
 ```
 
 ##### CSS files and CSS modules
@@ -115,10 +120,10 @@ These files must be included in pages explicitly with `<link>` tags, like you wo
 The CSS pipeline supports CSS modules:
 
 ```tsx
-import styles from "./styles.css";
+import styles from "./styles.css"
 
 // <span class="xxxxxx_red">
-const Red = ({ children }) => <span class={styles.red}>{children}</span>;
+const Red = ({ children }) => <span class={styles.red}>{children}</span>
 ```
 
 ### MDX pipeline

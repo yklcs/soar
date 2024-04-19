@@ -1,9 +1,5 @@
 import browserslist from "browserslist"
-import {
-	SelectorComponent,
-	browserslistToTargets,
-	transform as transformCss,
-} from "lightningcss"
+import { browserslistToTargets, transform as transformCss } from "lightningcss"
 import { parseHTML } from "linkedom"
 
 import { JSX, VNode } from "./jsx.js"
@@ -49,68 +45,8 @@ const formatChildren = (children: JSX.Children): string => {
 	return ""
 }
 
-const prerender = async (
-	root: VNode,
-): Promise<[VNode, Record<string, string>]> => {
-	const styles: Record<string, string> = {}
-	const _prerender = async (
-		node: JSX.Children,
-		depth: number,
-		scope: string,
-	): Promise<JSX.Children> => {
-		if (
-			node === true ||
-			node === false ||
-			node === undefined ||
-			node === null
-		) {
-			return node
-		}
-
-		if (Array.isArray(node)) {
-			const children = []
-			for (const child of node) {
-				children.push(await _prerender(child, depth, scope))
-			}
-			return children
-		} else if (typeof node === "string") {
-			return node
-		}
-
-		if (node.style) {
-			scope = await digest(node.style, 6)
-			styles[scope] = node.style
-		}
-		if (!node.scope) {
-			node.scope = scope
-		}
-
-		if (node.children) {
-			node.children = await _prerender(node.children, depth + 1, scope)
-		}
-
-		if (typeof node.type === "function") {
-			const inner = await node.type({ ...node.props, children: node.children })
-			node = await _prerender(inner, depth + 1, scope)
-		}
-
-		return node
-	}
-
-	root = (await _prerender(root, 0, "_root")) as VNode
-
-	return [root, styles]
-}
-
-const componentIsGlobal = (component?: SelectorComponent) =>
-	component &&
-	component.type === "pseudo-class" &&
-	component.kind === "custom" &&
-	component.name === "global"
-
 const render = async (root: VNode, document: Document): Promise<undefined> => {
-	let styles: Record<string, string>
-	;[root, styles] = await prerender(root)
+	const styles: Map<string, string> = new Map()
 
 	const _render = async (
 		node: JSX.Children,
@@ -140,6 +76,22 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 			return text
 		}
 
+		if ("_$style" in node.props) {
+			const style: string = node.props._$style.trim()
+			node.scope = `s${await digest(style, 6)}`
+			styles.set(node.scope, style)
+		}
+
+		if ("_$globalStyle" in node.props) {
+			const current = styles.get("global") ?? ""
+			styles.set("global", current + node.props._$globalStyle)
+		}
+
+		if (typeof node.type === "function") {
+			const inner = await node.type({ ...node.props, children: node.children })
+			return _render(inner, parent, depth + 1)
+		}
+
 		if (typeof node.type === "string") {
 			let el: HTMLElement
 			if (
@@ -167,13 +119,14 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 					} else {
 						el.setAttribute("class", val?.toString() ?? "")
 					}
+				} else if (key.startsWith("_")) {
 				} else {
 					el.setAttribute(key, val?.toString() ?? "")
 				}
 			}
 
 			// set scope only if node is in a scope
-			node.scope && el.setAttribute("scope", node.scope)
+			node.scope && el.classList.add(node.scope)
 			node.children && (await _render(node.children, el, depth + 1))
 
 			return el
@@ -187,104 +140,33 @@ const render = async (root: VNode, document: Document): Promise<undefined> => {
 
 	await _render(root, document, 0)
 
-	const targets = browserslistToTargets(browserslist(">= 0.25%"))
+	const css = compileStyles(styles)
+	const style = document.createElement("style")
+	style.textContent = css
+	document.head.appendChild(style)
+}
 
-	const css: string[] = []
-	for (const [scope, rawCss] of Object.entries(styles)) {
-		let contextWasGlobal = false
-		let lastWasGlobal = false
-
-		const { code, map } = transformCss({
-			filename: "style.css",
-			code: Buffer.from(rawCss),
-			minify: true,
-			targets,
-			visitor: {
-				Selector(selector) {
-					if (selector[0].type === "nesting") {
-						if (lastWasGlobal) {
-							const idx = selector.findIndex(
-								(c) => c.type !== "nesting" && c.type !== "combinator",
-							)
-							return selector.slice(idx)
-						}
-						if (contextWasGlobal) {
-							return selector
-						}
-					}
-					contextWasGlobal = false
-					lastWasGlobal = false
-
-					const scopeSelector: SelectorComponent = {
-						type: "attribute",
-						name: "scope",
-						operation: {
-							operator: "equal",
-							value: scope,
-						},
-					}
-
-					const scoped: SelectorComponent[] = []
-					for (let i = 0; i < selector.length; i++) {
-						switch (selector[i].type) {
-							case "pseudo-class": {
-								if (componentIsGlobal(selector[i])) {
-									contextWasGlobal = true
-									lastWasGlobal = i === selector.length - 1
-
-									for (
-										i++;
-										i < selector.length &&
-										(selector[i].type === "nesting" ||
-											selector[i].type === "combinator");
-										i++
-									) {}
-
-									if (i < selector.length) {
-										scoped.push(...selector.slice(i))
-									}
-
-									if (scoped.length === 0) {
-										scoped.push({ type: "universal" })
-									}
-
-									return scoped
-								}
-								scoped.push(selector[i])
-								break
-							}
-							case "universal": {
-								scoped.push(scopeSelector)
-								break
-							}
-							case "type": {
-								scoped.push(selector[i])
-								scoped.push(scopeSelector)
-								break
-							}
-							case "class": {
-								scoped.push(scopeSelector)
-								scoped.push(selector[i])
-								break
-							}
-							default: {
-								scoped.push(selector[i])
-							}
-						}
-					}
-
-					return scoped
-				},
-			},
-		})
-
-		const noGlobals = code.toString().replace(/:global\(([\s\S]*?)\)/gm, "$1")
-		css.push(noGlobals)
+const compileStyles = (styles: Map<string, string>) => {
+	let compiled = ""
+	for (const [scope, css] of styles) {
+		if (scope === "global") {
+			compiled += css
+		} else {
+			const scoped = `.${scope} { ${css} }`
+			compiled += scoped
+		}
 	}
 
-	const style = document.createElement("style")
-	style.textContent = css.join("")
-	document.head.appendChild(style)
+	const targets = browserslistToTargets(browserslist(">= 0.25%"))
+
+	const { code } = transformCss({
+		filename: "style.css",
+		code: Buffer.from(compiled),
+		minify: true,
+		targets,
+	})
+
+	return code.toString()
 }
 
 export { render, renderToString }
