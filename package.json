@@ -1,6 +1,6 @@
 {
   "name": "soar",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Soar, a minimal opinionated static site generator.",
   "main": "./lib/index.js",
   "bin": "./lib/cli.js",
