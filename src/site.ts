@@ -12,13 +12,15 @@ import * as path from "node:path"
 
 import type { JSX } from "./jsx.js"
 import { error, log } from "./log.js"
-import { type Action, default as pipeline } from "./pipeline.js"
+import transforms, {
+	type ContentTransform,
+	type PathTransform,
+} from "./transforms.js"
 
 interface File {
-	abs: string
-	rel: string
-	ext: string
-	underscore: boolean
+	file: string
+	path: string
+	content?: string
 }
 
 interface SiteOptions {
@@ -29,21 +31,27 @@ type Page = JSX.FunctionalElement<JSX.PageProps>
 type Generator = Record<string, Page>
 
 class Site {
-	files: File[]
+	files: Map<string, File>
 	rootdir: string
 	config?: SoarConfig
 	engine: string
-	actions: Action[] = []
-	tree: Record<string, () => Promise<string | Buffer>> = {}
+	transforms: {
+		path: PathTransform[]
+		content: ContentTransform[]
+	}
 
 	constructor(opts: SiteOptions) {
-		this.files = []
+		this.files = new Map()
 		this.rootdir = path.resolve(opts.rootdir ?? process.cwd())
 		this.engine = "Soar"
+		this.transforms = {
+			path: Object.values(transforms.path),
+			content: Object.values(transforms.content),
+		}
 		log(`Source: ${this.rootdir}`)
 	}
 
-	async register() {
+	private async register() {
 		register("./loader/esbuild.js", import.meta.url)
 		register("./loader/css.js", import.meta.url)
 		register("./loader/mdx.js", {
@@ -54,22 +62,31 @@ class Site {
 		})
 	}
 
-	async scanFiles() {
+	private async scan() {
 		const files = await globby("**/*", {
 			cwd: this.rootdir,
 			absolute: true,
 			ignore: [...(this.config?.ignore ?? []), "Soar.ts"],
 		})
-		this.files = files.map((file) => ({
-			abs: file,
-			rel: path.relative(this.rootdir, file),
-			ext: path.extname(file),
-			underscore: path.basename(file).startsWith("_"),
-		}))
-		log(`Discovered ${this.files.length} files`)
+
+		const entries = files.map(async (abs): Promise<[string, File]> => {
+			const rel = path.relative(this.rootdir, abs)
+			const file = { file: abs, path: rel }
+
+			const pathTransform = this.transforms.path.find(({ test }) => test(file))
+			if (pathTransform) {
+				const transformedPath = pathTransform.path(file)
+				file.path = transformedPath
+			}
+
+			return [file.path, file]
+		})
+
+		this.files = new Map(await Promise.all(entries))
+		log(`Discovered ${entries.length} files`)
 	}
 
-	async configure(): Promise<SoarConfig | undefined> {
+	private async configure(): Promise<SoarConfig | undefined> {
 		const file = path.join(this.rootdir, "Soar.ts")
 		if (!existsSync(file)) {
 			return undefined
@@ -81,47 +98,30 @@ class Site {
 		return this.config
 	}
 
-	async process() {
+	async init() {
 		await this.register()
 		await this.configure()
-		await this.scanFiles()
+		await this.scan()
+	}
 
-		for (const file of this.files) {
-			if (file.underscore) {
-				this.actions.push({
-					type: "copy",
-					url: file.rel,
-					from: file.abs,
-				})
-			} else if (file.ext in pipeline) {
-				const actions = pipeline[file.ext](file)
-				this.actions = [...this.actions, ...actions]
-			} else {
-				this.actions.push({
-					type: "copy",
-					url: file.rel,
-					from: file.abs,
-				})
-			}
+	list() {
+		return this.files.keys()
+	}
+
+	async get(path: string): Promise<string | Buffer | undefined> {
+		const file = this.files.get(path)
+		if (file === undefined) {
+			return undefined
 		}
 
-		for (const action of this.actions) {
-			switch (action.type) {
-				case "copy": {
-					this.tree[action.url] = async () => {
-						return await fs.readFile(action.from)
-					}
-					break
-				}
-				case "create": {
-					this.tree[action.url] = action.fn
-					break
-				}
-				case "delete": {
-					delete this.tree[action.url]
-					break
-				}
-			}
+		const contentTransform = this.transforms.content.find(({ test }) =>
+			test(file),
+		)
+
+		if (contentTransform) {
+			return contentTransform.content(file)
+		} else {
+			return fs.readFile(file.file)
 		}
 	}
 }
@@ -141,7 +141,7 @@ class Server extends Site {
 	}
 
 	async serve() {
-		this.server.get("*", async (req, res, next) => {
+		this.server.get("*", async (req, res) => {
 			if (req.url.endsWith("/") || !req.url.includes(".")) {
 				req.url = path.join(req.url, "index.html")
 			}
@@ -149,16 +149,16 @@ class Server extends Site {
 				req.url = req.url.slice(1)
 			}
 
-			const fn = this.tree[req.url]
+			const content = await this.get(req.url)
 
-			if (fn === undefined) {
+			if (content === undefined) {
 				error(`404 ${req.url}`)
 				return res.sendStatus(400)
 			}
 
 			res.contentType(path.basename(req.url))
 			try {
-				res.send(await fn())
+				res.send(content)
 			} catch (err) {
 				error(`Error serving ${req.url}:`)
 				if (err instanceof Error) {
@@ -182,7 +182,6 @@ interface BuilderOptions extends SiteOptions {
 
 class Builder extends Site {
 	outdir: string
-	actions: Action[] = []
 
 	constructor(opts: BuilderOptions) {
 		super(opts)
@@ -196,15 +195,19 @@ class Builder extends Site {
 			prefixText: chalk.blue("[Soar]"),
 		}).start()
 
-		for (const [file, fn] of Object.entries(this.tree)) {
-			const out = path.join(this.outdir, file)
+		for (const path_ of this.list()) {
+			const out = path.join(this.outdir, path_)
 			await fs.mkdir(path.dirname(out), { recursive: true })
 
 			try {
-				await fs.writeFile(out, await fn())
+				const got = await this.get(path_)
+				if (got === undefined) {
+					throw new Error(`internal error: could not find ${path_}`)
+				}
+				await fs.writeFile(out, got)
 			} catch (err) {
 				console.error()
-				error(`Error building ${file}:`)
+				error(`Error building ${path_}:`)
 				if (err instanceof Error) {
 					err.stack && error(err.stack)
 				}

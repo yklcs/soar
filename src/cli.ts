@@ -14,7 +14,7 @@ program
 		const start = performance.now()
 
 		const builder = new Builder({ rootdir: dir })
-		await builder.process()
+		await builder.init()
 		await builder.build()
 
 		const end = performance.now()
@@ -29,7 +29,7 @@ program
 	.option("-p, --port <port>", "server port", "8000")
 	.action(async (dir, opts) => {
 		const server = new Server({ rootdir: dir, port: opts.port })
-		await server.process()
+		await server.init()
 		await server.serve()
 	})
 
