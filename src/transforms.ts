@@ -52,7 +52,8 @@ const contentTransforms: Record<string, ContentTransform> = {
 	page: {
 		content: async (file) => {
 			const { default: page }: { default: Page } = await import(file.file)
-			const url = stripTrailingSlash(path.resolve("/", path.dirname(file.path)))
+			const url = path.resolve("/", stripTrailingSlash(path.dirname(file.path)))
+
 			const props = {
 				url,
 				generator: "Soar",
