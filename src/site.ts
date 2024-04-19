@@ -195,7 +195,7 @@ class Builder extends Site {
 			prefixText: chalk.blue("[Soar]"),
 		}).start()
 
-		for (const path_ of this.list()) {
+		const _build = async (path_: string) => {
 			const out = path.join(this.outdir, path_)
 			await fs.mkdir(path.dirname(out), { recursive: true })
 
@@ -213,6 +213,8 @@ class Builder extends Site {
 				}
 			}
 		}
+
+		await Promise.all(Array.from(this.list(), _build))
 		spinner.stop()
 	}
 }
