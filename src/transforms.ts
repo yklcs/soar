@@ -65,7 +65,6 @@ const contentTransforms: Record<string, ContentTransform> = {
 	},
 	css: {
 		content: async (file) => {
-			console.log(file)
 			const { code } = bundleCss({
 				filename: file.file,
 				cssModules: true,
